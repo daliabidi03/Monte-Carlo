@@ -3,7 +3,7 @@
 Projet du module **Mathématiques et Assurance** · ESPRIT · 2026-2027 · Encadrant : M. Mohsen Chebbi
 Équipe : Mohamed Derbel, Oumaima Mrabet, Tasnim Ghodbane, Adem Ben Ali, Mariem Hamouda.
 
-On calcule le prix d'un **call européen** par simulation de Monte-Carlo et on le compare au prix exact de **Black-Scholes** ($C_{BS} = 10{,}4506$). On réduit ensuite l'erreur avec deux techniques de réduction de variance : les **variables antithétiques** et la **variable de contrôle**. Tous les tirages gaussiens sont fabriqués par la **méthode de Box-Muller**.
+On calcule le prix d'un **call européen** par simulation de Monte-Carlo et on le compare au prix exact de **Black-Scholes** ($C_{BS} = 10{,}4506$). On réduit ensuite l'erreur avec deux techniques de réduction de variance : les **variables antithétiques** et la **variable de contrôle**. Enfin, on applique la méthode à une **option asiatique** (moyenne arithmétique), qui n'a pas de formule fermée. Tous les tirages gaussiens sont fabriqués par la **méthode de Box-Muller**.
 
 [![Ouvrir dans Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/daliabidi03/Monte-Carlo/blob/main/Projet_MonteCarlo_Call.ipynb)
 
@@ -32,6 +32,7 @@ Chaque partie commence par une courte introduction et l'équation utilisée ; ch
 | 7 | Variable de contrôle $X = S_T$ ($c^*$ analytique et estimé) | Étape 3 | `mc_controle` |
 | 8 | Comparaison : biais, MSE empirique, gain de variance, temps, efficacité | Étape 3.2 | |
 | 9 | Courbe de gain | Étape 3.2 | |
+| 10 | Option asiatique : grille complète, prix, sensibilité à $M$ et à $N$, variable de contrôle géométrique | Étape 4 | `mc_asiatique`, `prix_asiatique_geometrique` |
 
 ## Principaux résultats
 
@@ -40,14 +41,23 @@ Call européen, $S_0 = K = 100$, $T = 1$ an, $r = 5\,\%$, $\sigma = 20\,\%$, bud
 | Méthode | Prix (un calcul) | SE | MSE empirique | Gain de variance | Efficacité (temps compris) |
 |---|---|---|---|---|---|
 | Standard | 10,4419 | 0,01471 | 2,2·10⁻⁴ | ×1,0 | ×1,0 |
-| Antithétique | 10,4373 | 0,01035 | 1,3·10⁻⁴ | ×2,0 | ×3,9 |
-| Variable de contrôle | 10,4499 | 0,00561 | 3,5·10⁻⁵ | ×6,9 | ×7,1 |
+| Antithétique | 10,4373 | 0,01035 | 1,3·10⁻⁴ | ×2,0 | ×3,7 |
+| Variable de contrôle | 10,4499 | 0,00561 | 3,5·10⁻⁵ | ×6,9 | ×6,5 |
 
 Le coefficient de contrôle estimé sur un échantillon pilote vaut $c^* = 0{,}6413$, pour une valeur analytique de $0{,}6408$. Les temps (donc l'efficacité) dépendent de la machine ; les prix et les gains de variance, non.
 
+Call asiatique arithmétique (mêmes paramètres, moyenne sur $M$ dates, $N = 10^5$ trajectoires, variable de contrôle = call asiatique géométrique, qui a une formule fermée) :
+
+| $M$ (dates de moyenne) | 1 | 4 | 12 (mensuel) | 52 (hebdomadaire) | 252 (quotidien) |
+|---|---|---|---|---|---|
+| Prix | 10,4506 (= call européen) | 6,9394 | 6,1551 | 5,8536 | 5,7810 |
+| SE avec contrôle | 0 | 0,0009 | 0,0007 | 0,0007 | 0,0007 |
+
+Le prix baisse quand $M$ augmente, car la moyenne lisse la volatilité. La variable de contrôle géométrique divise la variance par environ 1 300.
+
 ## Exécuter le projet
 
-**Sans rien installer :** badge **Open in Colab** ci-dessus, puis *Exécution → Tout exécuter* (environ 40 secondes).
+**Sans rien installer :** badge **Open in Colab** ci-dessus, puis *Exécution → Tout exécuter* (environ une minute).
 
 **Sur sa machine :**
 ```bash

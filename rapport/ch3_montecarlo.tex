@@ -151,6 +151,26 @@ $N$ & Prix MC & IC à 95 \% & Erreur $|\CBS - \hat C|$ \\
 \end{table}
 À chaque puissance de 10, l'IC est divisé par environ $\sqrt{10}\approx3{,}16$ et contient $\CBS$ à chaque ligne. L'erreur d'une seule simulation dépend du hasard (elle est plus grande à $10^4$ qu'à $10^3$) ; c'est la largeur de l'IC qui diminue toujours.
 
+\subsection*{Pourquoi choisir $N = 10^6$ ?}
+La demi-largeur de l'IC vaut $1{,}96\,s/\sqrt N$, alors que le temps et la mémoire croissent comme $N$. Pour une précision $\varepsilon$ fixée, il faut $N_{\text{requis}} = (1{,}96\,s/\varepsilon)^2$, avec ici $s = 14{,}71$ (écart-type d'un payoff).
+\begin{table}[H]
+\centering\small
+\begin{tabular}{rcccc}
+\toprule
+$N$ & Demi-IC à 95 \% & Demi-IC / prix & Temps (s) & Mémoire (Mo) \\
+\midrule
+$10^3$ & 0,897 & 8,6 \% & 0,001 & $<1$ \\
+$10^4$ & 0,290 & 2,8 \% & $<0{,}001$ & $<1$ \\
+$10^5$ & 0,091 & 0,87 \% & 0,004 & 4 \\
+$\mathbf{10^6}$ & \textbf{0,029} & \textbf{0,28 \%} & \textbf{0,04} & \textbf{40} \\
+$10^7$ & 0,009 & 0,09 \% & 0,63 & 400 \\
+\bottomrule
+\end{tabular}
+\caption{Précision et coût du Monte-Carlo standard selon $N$ (temps dépendant de la machine).}
+\label{tab:choixN}
+\end{table}
+\textbf{Justification.} (1) L'énoncé demande l'étude pour $10^3\le N\le10^6$. (2) À $N = 10^6$, la précision est de $\pm0{,}029$, moins de $0{,}3\,\%$ du prix. (3) Le calcul prend moins d'un dixième de seconde, ce qui permet de le répéter 50 fois (§3.6.3). (4) Au-delà, le rendement décroît : $10^7$ coûte 10 fois plus de temps et de mémoire pour une précision seulement $\sqrt{10}\approx3{,}2$ fois meilleure ; une précision de $\pm0{,}01$ demanderait $N\approx8{,}3\cdot10^6$. La réduction de variance est plus rentable : avec la variable de contrôle, $N = 10^6$ donne déjà $\pm0{,}011$.
+
 \subsection*{Trajectoire de l'estimateur : stabilité}
 On suit la moyenne des $n$ premiers payoffs, $\hat C_n = \frac1n\sum_{i\le n}Y_i$, pour $n$ de 1 à $10^6$ (une seule simulation).
 \begin{figure}[H]

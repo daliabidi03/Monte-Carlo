@@ -14,25 +14,25 @@ Présenter les \textbf{modèles avant les méthodes} & Le chapitre 2 présente d
 \addlinespace
 Le critère 2 devient le \textbf{critère 1} & La forme du payoff (vanille / exotique) est le critère 1 ; l'instant d'exercice devient le critère 2. & Chap.~1, tab.~\ref{tab:criteres} \\
 \addlinespace
-Se \textbf{concentrer sur le call européen}, pas de put & Tout le projet porte sur le call. L'option asiatique est reportée à la phase suivante. & Tout le rapport \\
+Se \textbf{concentrer sur le call européen}, pas de put & Les chapitres 1 à 3 portent sur le call seul (pas de put). Une fois la méthode validée, elle est appliquée à l'option asiatique, dernière étape de l'énoncé. & Chap.~1 à 4 \\
 \addlinespace
-\textbf{Fixer le générateur} de nombres aléatoires & Un seul générateur \texttt{default\_rng(2026)} créé au début : en exécutant le notebook du début à la fin, on retrouve les mêmes chiffres. & §3.2 ; notebook, partie 1 \\
+\textbf{Fixer le générateur} de nombres aléatoires & Un générateur à graine fixée par partie (\texttt{generateur(partie)}, graine $2026 +$ numéro de la partie) : chaque partie redonne toujours les mêmes chiffres, même exécutée seule. & §3.3 ; notebook, partie 1 \\
 \addlinespace
-Utiliser la \textbf{méthode de Box-Muller}, avec \textbf{un seul $Z$} & $Z = \sqrt{-2\ln U_1}\cos(2\pi U_2)$ : une seule gaussienne par couple d'uniformes. Démonstration, exemple à la main, vérification sur un million de tirages. & §3.2 ; fig.~\ref{fig:bm} \\
+Utiliser la \textbf{méthode de Box-Muller}, avec \textbf{un seul $Z$} & $Z = \sqrt{-2\ln U_1}\cos(2\pi U_2)$ : une seule gaussienne par couple d'uniformes. Démonstration, exemple à la main, vérification sur un million de tirages. & §3.3 ; partie 2 ; fig.~\ref{fig:bm} \\
 \addlinespace
-\textbf{Méthode de base, puis optimiser} ; simulation de $C$ ($S_0$, exponentielle) & Monte-Carlo standard en 4 étapes ($Z$, $S_T = S_0\exp(\dots)$, payoff, moyenne), puis antithétique et variable de contrôle. & §3.1, §3.4, §3.5 \\
+\textbf{Méthode de base, puis optimiser} ; simulation de $C$ ($S_0$, exponentielle) & Monte-Carlo standard en 4 étapes ($Z$, $S_T = S_0\exp(\dots)$, payoff, moyenne), puis antithétique et variable de contrôle. & §3.1, §3.5, §3.6 \\
 \addlinespace
 Monte-Carlo et réduction de variance dans \textbf{la même section} & Un seul chapitre : méthode de base, puis réduction de variance, puis comparaison. & Chap.~3 \\
 \addlinespace
-\textbf{Démontrer comment on trouve $c$} et \textbf{le calculer dans le code} & Démonstration : variance quadratique en $c$, dérivée nulle, $c = \Cov/\Var$, minimum. Le code calcule $c^* = \Cov(Y,X)/\Var(X) = 0{,}640505$ ; le calcul analytique donne $0{,}640762$, erreur $|c_{\text{analytique}} - c^*| = 0{,}000257$. & §3.5.2 ; notebook, partie 6 \\
+\textbf{Démontrer comment on trouve $c$} et \textbf{le calculer dans le code} & Démonstration : variance quadratique en $c$, dérivée nulle, $c = \Cov/\Var$, minimum. Le code calcule $c^* = \Cov(Y,X)/\Var(X) = 0{,}641253$ sur un échantillon pilote ; le calcul analytique donne $0{,}640762$, erreur $|c_{\text{analytique}} - c^*| = 0{,}000490$. & §3.6.2 ; notebook, partie 7 \\
 \addlinespace
-Expliquer pourquoi l'\textbf{antithétique est la plus basse} et \textbf{pourquoi la courbe de gain} & Gain $= 1/(1+\rho)$ avec $\rho\approx-0{,}50$, contre $1/(1-\rho^2)$ avec $\rho\approx0{,}92$ ; courbe de gain : droites parallèles et gain constant en $N$. & §3.5.4 ; fig.~\ref{fig:gain} \\
+Expliquer pourquoi l'\textbf{antithétique est la plus basse} et \textbf{pourquoi la courbe de gain} & Gain $= 1/(1+\rho)$ avec $\rho\approx-0{,}50$, contre $1/(1-\rho^2)$ avec $\rho\approx0{,}92$ ; courbe de gain : droites parallèles et gain constant en $N$. & §3.6.5 ; fig.~\ref{fig:gain} \\
 \addlinespace
-Un \textbf{code simple et propre}, sans éléments en trop & Paramètres en variables simples (\texttt{S0}, \texttt{K}, \texttt{T}, \texttt{r}, \texttt{sigma} : pas de \texttt{o.T}), formules de $S_T$ et du payoff écrites directement dans chaque fonction (sans fonction intermédiaire), seulement ce que demande l'énoncé, en 9 parties courtes. Le meilleur estimateur est choisi sur l'erreur standard, pas sur l'écart d'une seule simulation. & Chap.~4 ; notebook \\
+Un \textbf{code simple et propre}, sans éléments en trop & Paramètres en variables simples (\texttt{S0}, \texttt{K}, \texttt{T}, \texttt{r}, \texttt{sigma} : pas de \texttt{o.T}), formules de $S_T$ et du payoff écrites directement dans chaque fonction (sans fonction intermédiaire), seulement ce que demande l'énoncé, en 10 parties courtes, chacune avec une introduction, son équation et une phrase par cellule. Le meilleur estimateur est choisi sur la MSE, pas sur l'écart d'une seule simulation. & Chap.~5 ; notebook \\
 \addlinespace
-\textbf{Erreur} par rapport à la valeur analytique, en valeur absolue & $|c_{\text{analytique}} - c^*|$ pour $c$, et $|\CBS - \hat C|$ pour le prix des trois méthodes. & §3.4, §3.5 \\
+\textbf{Erreur} par rapport à la valeur analytique, en valeur absolue & $|c_{\text{analytique}} - c^*|$ pour $c$, et $|\CBS - \hat C|$ pour le prix des trois méthodes. & §3.5, §3.6 \\
 \addlinespace
-\textbf{Puissances de $N$}, \textbf{trajectoire} et \textbf{stabilité} & Tableaux pour $N = 10, \dots, 10^6$ ; trajectoire $\hat C_n$ ; courbe de comparaison des trois méthodes ; 50 répétitions à $N = 10^6$ fixé avec l'erreur moyenne. & §3.4, §3.5 \\
+\textbf{Puissances de $N$}, \textbf{trajectoire} et \textbf{stabilité} & Tableaux pour $N = 10, \dots, 10^6$ ; trajectoire $\hat C_n$ ; courbe de comparaison des trois méthodes ; 50 répétitions à $N = 10^6$ fixé avec le biais et la MSE empirique. & §3.5, §3.6.3 \\
 \bottomrule
 \end{tabularx}
 \caption{Correspondance entre les remarques et les corrections.}

@@ -1,115 +1,145 @@
 \chapter{Implémentation : le code partie par partie}
 
-Le code est le notebook \texttt{Projet\_MonteCarlo\_Call.ipynb}. Il est volontairement court : les paramètres sont des variables simples, les formules de $S_T$ et du payoff sont écrites directement dans chaque fonction, et il ne contient que ce que demande l'énoncé. Il s'exécute du début à la fin en une vingtaine de secondes et redonne exactement les chiffres de ce rapport. L'explication détaillée, ligne par ligne, est dans le document \emph{Explication du code}.
+Le code est le notebook \texttt{Projet\_MonteCarlo\_Call.ipynb}. Chaque partie commence par une courte introduction et l'équation qu'elle implémente, et chaque cellule de code est précédée d'une phrase qui dit ce qu'elle fait. Les formules de $S_T$ et du payoff sont écrites directement dans chaque fonction. Le notebook s'exécute en une minute environ et redonne exactement les chiffres de ce rapport.
+
+Pour retrouver rapidement le code d'un résultat, la page \texttt{docs/index.html} (générée à partir du notebook) présente chaque partie avec ses résultats ; sous chaque tableau ou figure, le bouton \emph{Code de la cellule} affiche le code exact qui l'a produit.
 
 \begin{table}[H]
 \centering\small
-\begin{tabularx}{\textwidth}{>{\bfseries}p{1cm}p{5.2cm}L}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{1cm}p{5.4cm}Lp{1.6cm}}
 \toprule
-Partie & Fonctions & Rôle \\
+Partie & Fonctions & Rôle & Rapport \\
 \midrule
-1 & — & Imports, paramètres, générateur fixé \\
-2 & \texttt{box\_muller} & Fabriquer les tirages $Z\sim\Ncal(0,1)$ \\
-3 & \texttt{bs\_call} & Prix exact de Black-Scholes \\
-4 & \texttt{mc\_call\_standard} & Méthode de base : prix, IC, erreur, puissances de 10, trajectoire \\
-5 & \texttt{mc\_call\_antithetic} & Variables antithétiques \\
-6 & \texttt{mc\_call\_control} & Variable de contrôle, $c^*$, $c$ analytique et erreurs \\
-7 & — & Justification théorique \\
-8 & — & Comparaison : tableau, courbe, puissances de 10, stabilité à $N$ fixé \\
-9 & — & Courbe de gain \\
+1 & \texttt{generateur}, \texttt{enregistrer} & Paramètres, un générateur à graine fixée par partie, figures & \\
+2 & \texttt{box\_muller} & Tirages $Z\sim\Ncal(0,1)$ & §\ref{sec:bm} \\
+3 & \texttt{prix\_call\_bs} & Prix exact de Black-Scholes & chap.~2 \\
+4 & \texttt{simuler\_trajectoires} & Grille temporelle, schéma exact et schéma d'Euler & §\ref{sec:discr} \\
+5 & \texttt{mc\_standard} & Monte-Carlo de base : prix, IC, puissances de 10, trajectoire & §3.5 \\
+6 & \texttt{mc\_antithetique} & Variables antithétiques, corrélation $\rho$ & §3.6.1 \\
+7 & \texttt{mc\_controle} & Variable de contrôle, $c^*$ analytique et pilote & §3.6.2 \\
+8 & --- & 50 répétitions : biais, MSE, gain, temps, efficacité & §3.6.3 \\
+9 & --- & Courbe de gain & §3.6.5 \\
+10 & \texttt{prix\_asiatique\_geometrique}, \texttt{mc\_asiatique} & Option asiatique, sensibilité à $M$ et $N$ & chap.~\ref{ch:asiatique} \\
 \bottomrule
 \end{tabularx}
 \caption{Plan du notebook.}
 \end{table}
 
-\section*{1. Imports et paramètres}
-\addcontentsline{toc}{section}{1. Imports et paramètres}
-\begin{lstlisting}
-S0    = 100.0      # prix de l'action aujourd'hui
-K     = 100.0      # prix d'exercice (strike)
-T     = 1.0        # maturité : 1 an
-r     = 0.05       # taux sans risque
-sigma = 0.20       # volatilité
-N     = 1_000_000  # nombre de simulations
-rng = np.random.default_rng(2026)   # générateur fixé par une graine
-z95 = 1.96                          # P(|Z| <= 1.96) = 95 %
-\end{lstlisting}
-Les cinq paramètres sont écrits une seule fois et utilisés directement par toutes les fonctions. Le générateur \texttt{rng} est créé une seule fois avec la graine 2026 : en exécutant le notebook du début à la fin, on obtient toujours les mêmes nombres.
-
-\section*{2. Box-Muller}
-\addcontentsline{toc}{section}{2. Box-Muller}
+\section*{Box-Muller (partie 2)}
+\addcontentsline{toc}{section}{Box-Muller (partie 2)}
 \begin{lstlisting}
 def box_muller(n, rng):
-    U1 = 1.0 - rng.random(n)          # uniforme sur ]0,1]
-    U2 = rng.random(n)                # uniforme sur [0,1[
+    """n tirages de loi N(0,1), fabriqués à partir de 2n uniformes."""
+    U1 = 1.0 - rng.random(n)    # uniforme sur ]0,1] : évite ln(0)
+    U2 = rng.random(n)          # uniforme sur [0,1[
     return np.sqrt(-2.0 * np.log(U1)) * np.cos(2.0 * np.pi * U2)
 \end{lstlisting}
-Formule $Z = \sqrt{-2\ln U_1}\cos(2\pi U_2)$, démontrée au §\ref{sec:bm} : \textbf{une seule} gaussienne par couple d'uniformes. $1-U$ évite $\ln 0$. La cellule vérifie sur un million de tirages : moyenne $-0{,}0010$, variance $0{,}9987$, $\Q(|Z|\le1{,}96) = 0{,}9503$, et trace l'histogramme (figure~\ref{fig:bm}).
+Formule $Z = \sqrt{-2\ln U_1}\cos(2\pi U_2)$ démontrée au §\ref{sec:bm} ; $1-U$ évite $\ln 0$. Toutes les simulations du projet passent par cette fonction.
 
-\section*{3. Black-Scholes}
-\addcontentsline{toc}{section}{3. Black-Scholes}
+\section*{Black-Scholes (partie 3)}
+\addcontentsline{toc}{section}{Black-Scholes (partie 3)}
 \begin{lstlisting}
-def bs_call():
+def prix_call_bs(S0, K, T, r, sigma):
+    """Prix exact du call européen (formule de Black-Scholes)."""
     d1 = (np.log(S0 / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)
     return S0 * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
 \end{lstlisting}
-Formule démontrée au chapitre 2. \texttt{norm.cdf} est la fonction de répartition $N(x)$ de la loi $\Ncal(0,1)$ (bibliothèque \texttt{scipy}). Résultat : $\CBS = 10{,}4506$.
+La fonction prend les cinq paramètres $C_{BS}(S_0, K, T, r, \sigma)$, comme dans l'énoncé. \texttt{norm.cdf} est la fonction de répartition $N(x)$ de $\Ncal(0,1)$. Résultat : $\CBS = 10{,}4506$.
 
-\section*{4. Monte-Carlo standard}
-\addcontentsline{toc}{section}{4. Monte-Carlo standard}
+\section*{Trajectoires (partie 4)}
+\addcontentsline{toc}{section}{Trajectoires (partie 4)}
 \begin{lstlisting}
-def mc_call_standard(N, rng):
-    Z  = box_muller(N, rng)                                              # 1) tirages N(0,1)
-    ST = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)   # 2) prix finaux
-    Y  = np.exp(-r * T) * np.maximum(ST - K, 0.0)                        # 3) payoffs actualisés
-    prix = Y.mean()                                                      # 4) moyenne
-    se   = Y.std(ddof=1) / np.sqrt(N)                                    #    erreur standard
-    return prix, se
+def simuler_trajectoires(n, M, rng, schema="exact"):
+    """Tableau (n, M+1) : n trajectoires de S aux dates t_0 = 0, t_1, ..., t_M = T."""
+    dt = T / M
+    Z = box_muller(n * M, rng).reshape(n, M)
+    if schema == "exact":
+        facteurs = np.exp((r - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * Z)
+    else:  # schéma d'Euler
+        facteurs = 1.0 + r * dt + sigma * np.sqrt(dt) * Z
+    S = np.empty((n, M + 1))
+    S[:, 0] = S0
+    S[:, 1:] = S0 * np.cumprod(facteurs, axis=1)
+    return S
 \end{lstlisting}
-Les quatre étapes de l'algorithme, une ligne chacune. La ligne 2 est la solution exacte de l'EDS (chapitre 2) : pas d'erreur de discrétisation. \texttt{ddof=1} divise par $N-1$. L'IC est \texttt{prix} $\pm$ \texttt{z95*se}, et l'erreur est \texttt{abs(C\_exact - prix)}. Résultat pour $N = 10^6$ : $10{,}4370$, IC $[10{,}4081\ ;\ 10{,}4658]$, erreur $0{,}0136$. Les cellules suivantes tracent l'IC pour 25 valeurs de $N$ (figure~\ref{fig:icN}), le tableau des puissances de 10 et la trajectoire \texttt{np.cumsum(Y) / n} (figure~\ref{fig:traj}).
+Les $M$ facteurs multiplicatifs de chaque trajectoire sont tirés d'un coup, puis \texttt{np.cumprod} les enchaîne : $S_{t_j} = S_0\prod_{k\le j}(\text{facteur}_k)$. Avec la même graine, les deux schémas utilisent les mêmes $Z$, ce qui isole le biais d'Euler (tableau~\ref{tab:euler}).
 
-\section*{5. Variables antithétiques}
-\addcontentsline{toc}{section}{5. Variables antithétiques}
+\section*{Monte-Carlo standard (partie 5)}
+\addcontentsline{toc}{section}{Monte-Carlo standard (partie 5)}
 \begin{lstlisting}
-def mc_call_antithetic(N, rng):
-    Z = box_muller(N // 2, rng)                                                  # N/2 tirages
+def mc_standard(n, rng):
+    """Monte-Carlo standard : renvoie (prix estimé, erreur standard)."""
+    Z  = box_muller(n, rng)                                               # 1) tirages N(0,1)
+    ST = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)   # 2) prix finaux (schéma exact)
+    Y  = np.exp(-r * T) * np.maximum(ST - K, 0.0)                         # 3) payoffs actualisés
+    return Y.mean(), Y.std(ddof=1) / np.sqrt(n)                           # 4) moyenne et SE
+\end{lstlisting}
+Les quatre étapes de l'algorithme, une ligne chacune ; \texttt{ddof=1} divise par $N-1$. L'IC est \texttt{prix} $\pm$ \texttt{Z95 * se}. Résultat pour $N = 10^6$ : $10{,}4419$, IC $[10{,}4130\ ;\ 10{,}4707]$.
+
+\section*{Variables antithétiques (partie 6)}
+\addcontentsline{toc}{section}{Variables antithétiques (partie 6)}
+\begin{lstlisting}
+def mc_antithetique(n, rng):
+    """Variables antithétiques avec n payoffs (n/2 paires) : renvoie (prix, SE)."""
+    Z = box_muller(n // 2, rng)
     ST_plus  = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)    # avec Z
-    ST_minus = S0 * np.exp((r - 0.5 * sigma**2) * T - sigma * np.sqrt(T) * Z)    # avec -Z
+    ST_moins = S0 * np.exp((r - 0.5 * sigma**2) * T - sigma * np.sqrt(T) * Z)    # avec -Z
     Y_plus   = np.exp(-r * T) * np.maximum(ST_plus - K, 0.0)
-    Y_minus  = np.exp(-r * T) * np.maximum(ST_minus - K, 0.0)
-    Y_anti   = (Y_plus + Y_minus) / 2                                            # moyenne de la paire
-    prix = Y_anti.mean()
-    se   = Y_anti.std(ddof=1) / np.sqrt(N // 2)
-    return prix, se
+    Y_moins  = np.exp(-r * T) * np.maximum(ST_moins - K, 0.0)
+    Y_paire  = (Y_plus + Y_moins) / 2                                            # moyenne de chaque paire
+    return Y_paire.mean(), Y_paire.std(ddof=1) / np.sqrt(n // 2)
 \end{lstlisting}
-$N/2$ tirages donnent $N$ payoffs : même budget que le standard. Les $N/2$ moyennes de paires sont indépendantes, d'où l'erreur standard calculée avec $\sqrt{N/2}$. Résultat : $10{,}4600$, $SE = 0{,}01039$, erreur $0{,}0094$.
+$n/2$ tirages donnent $n$ payoffs : même budget que le standard. Les $n/2$ moyennes de paires sont indépendantes, d'où l'erreur standard calculée avec $\sqrt{n/2}$. Résultat : $10{,}4373$, $SE = 0{,}01035$.
 
-\section*{6. Variable de contrôle et calcul de $c$}
-\addcontentsline{toc}{section}{6. Variable de contrôle et calcul de c}
+\section*{Variable de contrôle (partie 7)}
+\addcontentsline{toc}{section}{Variable de contrôle (partie 7)}
 \begin{lstlisting}
-def mc_call_control(N, rng):
-    Z  = box_muller(N, rng)
+def mc_controle(n, rng, c=c_pilote):
+    """Variable de contrôle X = S_T : renvoie (prix, SE)."""
+    Z  = box_muller(n, rng)
     ST = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)
     Y  = np.exp(-r * T) * np.maximum(ST - K, 0.0)
-    X  = ST                                            # variable de contrôle
-    EX = S0 * np.exp(r * T)                            # son espérance exacte
-    c_star = np.cov(Y, X)[0, 1] / np.var(X, ddof=1)    # c* = Cov(Y,X) / Var(X)
-    Y_c  = Y - c_star * (X - EX)                       # estimateur corrigé
-    prix = Y_c.mean()
-    se   = Y_c.std(ddof=1) / np.sqrt(N)
-    return prix, se, c_star
-
-# c analytique (loi log-normale de S_T)
-c_analytique = cov_exact / var_exact
-print(abs(c_analytique - c_star))                      # erreur sur c
+    Y_c = Y - c * (ST - S0 * np.exp(r * T))       # on retire l'écart de S_T à sa moyenne connue
+    return Y_c.mean(), Y_c.std(ddof=1) / np.sqrt(n)
 \end{lstlisting}
-\texttt{np.cov(Y, X)} renvoie la matrice de covariance de $(Y,X)$ ; son élément \texttt{[0, 1]} est $\Cov(Y,X)$. La formule $c^* = \Cov(Y,X)/\Var(X)$ est démontrée au chapitre 3, ainsi que $c_{\text{analytique}}$. Résultat : $c^* = 0{,}640505$, $c_{\text{analytique}} = 0{,}640762$, erreur $0{,}000257$ ; prix $10{,}4472$, $SE = 0{,}00562$, erreur $0{,}0034$.
+Le coefficient \texttt{c\_pilote} $= 0{,}641253$ est calculé avant, sur un échantillon pilote indépendant, par \texttt{np.cov(Y, ST)[0, 1] / np.var(ST, ddof=1)} ; la partie 7 le compare à $c_{\text{analytique}} = 0{,}640762$. Résultat : $10{,}4499$, $SE = 0{,}00561$.
 
-\section*{7 à 9. Théorie, comparaison et courbe de gain}
-\addcontentsline{toc}{section}{7 à 9. Théorie, comparaison et courbe de gain}
-La partie 7 rappelle les démonstrations. La partie 8 reprend les trois résultats et affiche le tableau~\ref{tab:rv} (temps moyen sur 5 exécutions mesuré par \texttt{time.perf\_counter()}), trace la courbe de comparaison (figure~\ref{fig:cmp3}), le tableau des puissances de 10 pour les trois méthodes, puis répète 50 fois chaque méthode à $N = 10^6$ pour la stabilité et l'erreur moyenne (figure~\ref{fig:stab}). La partie 9 calcule l'erreur standard des trois méthodes pour 10 valeurs de $N$ et trace la courbe de gain (figure~\ref{fig:gain}).
+\section*{Comparaison et courbe de gain (parties 8 et 9)}
+\addcontentsline{toc}{section}{Comparaison et courbe de gain (parties 8 et 9)}
+La partie 8 répète chaque méthode 50 fois à $N = 10^6$ (figure~\ref{fig:stab}), mesure le temps médian de 5 exécutions avec \texttt{time.perf\_counter()} et affiche le tableau~\ref{tab:rv}. La partie 9 calcule l'erreur standard des trois méthodes pour 10 valeurs de $N$ et trace la courbe de gain (figure~\ref{fig:gain}).
+
+\section*{Option asiatique (partie 10)}
+\addcontentsline{toc}{section}{Option asiatique (partie 10)}
+\begin{lstlisting}
+def prix_asiatique_geometrique(S0, K, T, r, sigma, M):
+    """Prix exact du call asiatique à moyenne géométrique sur M dates."""
+    mu = np.log(S0) + (r - 0.5 * sigma**2) * T * (M + 1) / (2 * M)
+    v  = sigma**2 * T * (M + 1) * (2 * M + 1) / (6 * M**2)
+    d1 = (mu + v - np.log(K)) / np.sqrt(v)
+    d2 = (mu - np.log(K)) / np.sqrt(v)
+    return np.exp(-r * T) * (np.exp(mu + v / 2) * norm.cdf(d1) - K * norm.cdf(d2))
+\end{lstlisting}
+\begin{lstlisting}
+def payoffs_asiatiques(n, M, rng):
+    """Payoffs actualisés des calls arithmétique (Y) et géométrique (X) sur n trajectoires."""
+    S = simuler_trajectoires(n, M, rng)[:, 1:]      # prix aux dates t_1, ..., t_M
+    A = S.mean(axis=1)                              # moyenne arithmétique
+    G = np.exp(np.log(S).mean(axis=1))              # moyenne géométrique
+    return np.exp(-r * T) * np.maximum(A - K, 0.0), np.exp(-r * T) * np.maximum(G - K, 0.0)
+\end{lstlisting}
+\begin{lstlisting}
+def mc_asiatique(n, M, rng, n_pilote=10_000):
+    """Renvoie {'standard': (prix, SE), 'controle': (prix, SE)} pour le call asiatique arithmétique."""
+    Y_p, X_p = payoffs_asiatiques(n_pilote, M, rng)                 # échantillon pilote
+    c = np.cov(Y_p, X_p)[0, 1] / np.var(X_p, ddof=1)
+    Y, X = payoffs_asiatiques(n, M, rng)
+    Y_c = Y - c * (X - prix_asiatique_geometrique(S0, K, T, r, sigma, M))
+    return {"standard": (Y.mean(), Y.std(ddof=1) / np.sqrt(n)),
+            "controle": (Y_c.mean(), Y_c.std(ddof=1) / np.sqrt(n))}
+\end{lstlisting}
+\texttt{payoffs\_asiatiques} réutilise \texttt{simuler\_trajectoires} (schéma exact) et calcule les deux moyennes sur les dates $t_1,\dots,t_M$. \texttt{mc\_asiatique} estime $c^*$ sur un pilote, puis renvoie le prix standard et le prix contrôlé (tableau~\ref{tab:asiaM}, figure~\ref{fig:asiaN}).
 
 \begin{retenir}
-\textbf{Reproductibilité.} En exécutant le notebook de haut en bas (\emph{Kernel $\to$ Restart \& Run All}), on retrouve tous les nombres et toutes les figures de ce rapport. Seuls les temps de calcul varient d'une machine à l'autre.
+\textbf{Reproductibilité.} Chaque partie a son propre générateur (\texttt{generateur(partie)}) : en exécutant le notebook, ou une partie seule après la partie 1, on retrouve les nombres et les figures de ce rapport. Seuls les temps de calcul varient d'une machine à l'autre.
 \end{retenir}

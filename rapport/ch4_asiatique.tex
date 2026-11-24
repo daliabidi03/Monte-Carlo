@@ -1,0 +1,101 @@
+\chapter{Option asiatique : Monte-Carlo sans formule fermée}\label{ch:asiatique}
+
+Le call européen a servi de banc d'essai : on a vérifié que Monte-Carlo retrouve le prix exact, que l'intervalle de confiance est juste et que la réduction de variance fonctionne. On applique maintenant la méthode à un produit qui n'a \textbf{pas de formule fermée} : c'est son vrai usage en pratique.
+
+\section{Le produit et l'algorithme}
+
+Le call asiatique à moyenne arithmétique observe le sous-jacent à $M$ dates $t_j = j\,T/M$ ($j = 1,\dots,M$) et paie à l'échéance
+\[
+\text{payoff} = (A-K)^+,\qquad A = \frac1M\sum_{j=1}^M S_{t_j},\qquad C_A = e^{-rT}\,\E\big[(A-K)^+\big].
+\]
+\textbf{Pourquoi pas de formule fermée.} Chaque $S_{t_j}$ est log-normal, mais une \emph{somme} de variables log-normales n'est pas log-normale : on ne connaît pas la loi de $A$, donc on ne sait pas calculer l'espérance analytiquement. Le payoff dépend de toute la trajectoire, pas seulement de $S_T$ : l'option est \emph{dépendante du chemin}.
+
+\textbf{Algorithme.} Pour chacune des $N$ trajectoires :
+\begin{enumerate}[nosep]
+\item tirer $Z_1,\dots,Z_M\sim\Ncal(0,1)$ par Box-Muller ;
+\item construire la grille $S_{t_0} = S_0, S_{t_1},\dots,S_{t_M}$ avec le \textbf{schéma exact} (section~\ref{sec:discr}), qui ne fait aucune erreur de discrétisation aux dates d'observation ;
+\item calculer la moyenne $A$ et le payoff actualisé $Y = e^{-rT}(A-K)^+$.
+\end{enumerate}
+Puis $\hat C_A = \frac1N\sum_i Y_i$, avec l'erreur standard et l'IC à 95 \% du chapitre 3.
+
+\begin{figure}[H]
+\centering\includegraphics[width=0.75\textwidth]{fig_asiatique_trajectoires}
+\caption{Cinq trajectoires mensuelles ($M = 12$) et la moyenne $A$ de chacune (pointillés) : la moyenne varie beaucoup moins que $S_T$.}
+\end{figure}
+
+\section{Variable de contrôle : le call asiatique géométrique}
+
+On réutilise l'idée du chapitre 3 avec une variable de contrôle bien meilleure que $S_T$ : le call sur la moyenne \textbf{géométrique} $G = \big(\prod_{j=1}^M S_{t_j}\big)^{1/M}$, dont le prix est connu exactement.
+
+\begin{demo}[ — prix exact du call asiatique géométrique]
+\textbf{Loi de $\ln G$.} Comme $\ln S_{t_j} = \ln S_0 + (r-\sigma^2/2)t_j + \sigma W_{t_j}$,
+\[
+\ln G = \frac1M\sum_{j=1}^M\ln S_{t_j} = \ln S_0 + \Big(r-\frac{\sigma^2}2\Big)\frac1M\sum_j t_j + \frac{\sigma}{M}\sum_j W_{t_j}.
+\]
+C'est une combinaison linéaire de variables gaussiennes : $\ln G$ est gaussien, donc $G$ est \textbf{log-normal}.
+
+\textbf{Moyenne.} $\frac1M\sum_j t_j = \frac{T}{M^2}\sum_j j = \frac{T(M+1)}{2M}$, d'où $\mu_G = \ln S_0 + (r-\sigma^2/2)\frac{T(M+1)}{2M}$.
+
+\textbf{Variance.} Avec $\Cov(W_{t_i},W_{t_j}) = \min(t_i,t_j)$ et $\sum_{i,j}\min(i,j) = \frac{M(M+1)(2M+1)}{6}$ :
+\[
+v_G = \frac{\sigma^2}{M^2}\sum_{i,j}\min(t_i,t_j) = \sigma^2\,\frac{T(M+1)(2M+1)}{6M^2}.
+\]
+\textbf{Prix.} Pour $G$ log-normal de paramètres $(\mu_G, v_G)$, le même calcul que pour Black-Scholes donne
+\[
+\boxed{C_G = e^{-rT}\Big[e^{\mu_G+v_G/2}\,N(d_1) - K\,N(d_2)\Big],\qquad d_1 = \frac{\mu_G + v_G - \ln K}{\sqrt{v_G}},\quad d_2 = d_1-\sqrt{v_G}.}
+\]
+\textbf{Vérification.} Pour $M = 1$, $G = S_T$, $\mu_G = \ln S_0 + (r-\sigma^2/2)T$ et $v_G = \sigma^2T$ : on retrouve $C_G = \CBS = 10{,}4506$ (le code le vérifie).
+\end{demo}
+
+L'estimateur contrôlé est $Y_c = Y - c\,(X - C_G)$ avec $X = e^{-rT}(G-K)^+$, et $c^* = \Cov(Y,X)/\Var(X)$ estimé, comme au chapitre 3, sur un échantillon pilote indépendant ($10^4$ trajectoires). Comme $G\le A$ (inégalité arithmético-géométrique) et que les deux moyennes sont très proches, $Y$ et $X$ sont presque parfaitement corrélés : le gain $1/(1-\rho^2)$ est énorme.
+
+\textbf{Résultat ($M = 12$, $N = 10^6$).}
+\[
+\hat C_A^{\,\text{standard}} = 6{,}1459\ (SE = 0{,}00850),\qquad \hat C_A^{\,\text{contrôle}} = 6{,}1561\ (SE = 0{,}00024),\qquad IC_{95\%} = [6{,}1556\ ;\ 6{,}1565].
+\]
+Le gain de variance vaut $(0{,}00850/0{,}00024)^2\approx1\,300$, contre 6,9 pour le call européen avec $X = S_T$ : avec $N = 10^6$ trajectoires contrôlées, on obtient la précision qu'il faudrait plus d'un milliard de trajectoires pour atteindre en standard.
+
+\section{Sensibilité à la fréquence de discrétisation $M$}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{rcccccc}
+\toprule
+$M$ & Prix standard & $SE$ & Prix contrôle & $SE$ & Gain de variance & Temps (s) \\
+\midrule
+1 & 10,4449 & 0,0464 & 10,4506 & 0 & exact & 0,01 \\
+4 & 6,9047 & 0,0303 & 6,9394 & 0,00087 & $\times1\,206$ & 0,04 \\
+12 & 6,1415 & 0,0268 & 6,1551 & 0,00074 & $\times1\,314$ & 0,09 \\
+52 & 5,8630 & 0,0256 & 5,8536 & 0,00071 & $\times1\,316$ & 0,33 \\
+252 & 5,7691 & 0,0252 & 5,7810 & 0,00069 & $\times1\,322$ & 1,87 \\
+\bottomrule
+\end{tabular}
+\caption{Prix du call asiatique en fonction du nombre de dates $M$ ($N = 10^5$ trajectoires).}
+\label{tab:asiaM}
+\end{table}
+
+\begin{figure}[H]
+\centering\includegraphics[width=0.75\textwidth]{fig_asiatique_M}
+\caption{Prix du call asiatique (IC à 95 \%) en fonction de $M$ ; la ligne rouge est le call européen.}
+\end{figure}
+
+\textbf{Lecture.}
+\begin{itemize}[nosep]
+\item Pour $M = 1$, l'option asiatique \emph{est} le call européen : on retrouve $\CBS$, et le contrôle est parfait ($A = G = S_T$).
+\item Le prix \textbf{diminue} quand $M$ augmente : la moyenne lisse les variations, sa volatilité est plus faible que celle de $S_T$ (environ $\sigma/\sqrt3$ pour une moyenne continue), donc l'option vaut moins. Le prix converge vers celui de la moyenne continue, environ $5{,}78$ : passer d'une moyenne hebdomadaire à quotidienne ne change le prix que de $0{,}07$.
+\item Le temps de calcul croît proportionnellement à $M$ (il faut $N\times M$ tirages), alors que le gain de la variable de contrôle reste d'environ 1\,300 pour tout $M\ge4$.
+\end{itemize}
+
+\section{Sensibilité au nombre de trajectoires $N$}
+
+\begin{figure}[H]
+\centering\includegraphics[width=\textwidth]{fig_asiatique_N}
+\caption{$M = 12$. Gauche : prix et IC à 95 \% en fonction de $N$. Droite : erreur standard en fonction de $N$ (log-log).}
+\label{fig:asiaN}
+\end{figure}
+
+Comme pour le call européen, l'erreur standard décroît en $1/\sqrt N$ (droites de pente $-1/2$), et la variable de contrôle abaisse la droite d'un facteur $\sqrt{1\,300}\approx36$ : avec $N = 10^3$ trajectoires contrôlées, l'IC est déjà plus étroit qu'avec $10^6$ trajectoires standard.
+
+\begin{retenir}
+Le call européen a validé la méthode (biais nul, IC justes, gains de variance mesurés) ; l'option asiatique montre son intérêt : sans formule fermée, Monte-Carlo donne un prix \emph{et} une mesure de sa précision. Le bon choix de variable de contrôle (un produit voisin dont le prix est connu) compte plus que tout le reste.
+\end{retenir}

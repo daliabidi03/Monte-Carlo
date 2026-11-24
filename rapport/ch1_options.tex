@@ -56,7 +56,7 @@ Une option \textbf{vanille} a un payoff qui dépend du seul prix final $S_T$ : $
 Famille & Payoff (call) & Particularité \\
 \midrule
 Vanille & $(S_T-K)^+$ & Dépend de $S_T$ seulement. Formule de Black-Scholes. \textbf{Notre cas d'étude.} \\
-Asiatique & $(A-K)^+$, $A = \frac1M\sum_{j=1}^M S_{t_j}$ & \emph{Path-dependent} : moyenne sur la trajectoire. Étudiée dans la phase suivante. \\
+Asiatique & $(A-K)^+$, $A = \frac1M\sum_{j=1}^M S_{t_j}$ & \emph{Path-dependent} : moyenne sur la trajectoire. Étudiée au chapitre~\ref{ch:asiatique}. \\
 À barrière & $(S_T-K)^+\1_{\{\max_t S_t < B\}}$ & \emph{Path-dependent} : s'annule si la barrière $B$ est franchie. \\
 Lookback & $S_T - \min_{t\le T}S_t$ & \emph{Path-dependent} : dépend de l'extremum atteint. \\
 Digitale & $\1_{\{S_T>K\}}$ & Payoff discontinu (tout ou rien). \\
@@ -94,7 +94,7 @@ Pour un call sur un actif sans dividende, l'exercice anticipé n'est jamais opti
 \toprule
  & Vanille & Exotique \\
 \midrule
-Européenne & \textbf{Call européen} (Black-Scholes) $\leftarrow$ \textbf{notre cas d'étude} & Asiatique (phase suivante), barrière, digitale \\
+Européenne & \textbf{Call européen} (Black-Scholes) $\leftarrow$ \textbf{notre cas d'étude} & Asiatique (chapitre~\ref{ch:asiatique}), barrière, digitale \\
 Bermudéenne & Call ou put bermudéen, swaption bermudéenne & Variantes exotiques à dates d'exercice discrètes \\
 Américaine & Put américain sur action & Asiatique ou barrière américaine (rares) \\
 \bottomrule
@@ -112,7 +112,7 @@ Selon les deux critères, le call européen est une option \textbf{vanille} (cri
 \item il a donc un \textbf{prix exact}, $\CBS = 10{,}4506$ avec nos paramètres (chapitre 2) ;
 \item on peut ainsi mesurer exactement l'erreur de Monte-Carlo, vérifier l'intervalle de confiance et comparer objectivement les techniques de réduction de variance (chapitre 3).
 \end{itemize}
-Une fois la méthode validée sur ce cas, elle pourra être appliquée en toute confiance aux options sans formule fermée, comme l'option asiatique, dans la phase suivante du projet.
+Une fois la méthode validée sur ce cas, elle pourra être appliquée en toute confiance aux options sans formule fermée, comme l'option asiatique (chapitre~\ref{ch:asiatique}).
 
 \begin{table}[H]
 \centering\small

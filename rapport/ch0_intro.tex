@@ -4,23 +4,25 @@
 
 La valorisation des produits dérivés est un enjeu central de l'ingénierie financière et de l'assurance : banques et assureurs doivent attribuer un prix à des contrats dont la valeur dépend de l'évolution future d'un actif, le \emph{sous-jacent}. Depuis les travaux de Black, Scholes et Merton (1973), la modélisation stochastique est le cadre de référence.
 
-Ce projet du module \emph{Mathématiques et Assurance} étudie de façon méthodique la \textbf{simulation de Monte-Carlo}. Conformément aux consignes de l'encadrant, cette phase du projet porte sur \textbf{l'option d'achat (call) européenne}. Ce choix fait de l'option un \emph{banc d'essai} idéal : son prix exact $\CBS$ est donné par la formule de Black-Scholes, ce qui permet de mesurer exactement l'erreur de la simulation, sa vitesse de convergence et l'efficacité des techniques de réduction de variance. L'application aux options dépendantes du chemin (option asiatique) fera l'objet de la phase suivante du projet.
+Ce projet du module \emph{Mathématiques et Assurance} étudie de façon méthodique la \textbf{simulation de Monte-Carlo}. Il procède en deux temps. L'\textbf{option d'achat (call) européenne} sert d'abord de \emph{banc d'essai} idéal : son prix exact $\CBS$ est donné par la formule de Black-Scholes, ce qui permet de mesurer exactement l'erreur de la simulation, sa vitesse de convergence et l'efficacité des techniques de réduction de variance. La méthode, ainsi validée, est ensuite appliquée à une option dépendante du chemin, l'\textbf{option asiatique} à moyenne arithmétique, qui n'a pas de formule fermée : c'est là que Monte-Carlo montre sa vraie valeur pratique.
 
-\paragraph{Démarche.} Le travail suit les trois premières étapes de l'énoncé :
+\paragraph{Démarche.} Le travail suit les quatre étapes de l'énoncé :
 \begin{enumerate}[nosep]
   \item modèle de Black-Scholes, résolution log-normale et formule analytique $\CBS$ ;
-  \item Monte-Carlo standard (la « méthode de base »), avec des tirages gaussiens générés par la méthode de Box-Muller, et intervalle de confiance à 95\,\% pour $10^3\le N\le 10^6$ ;
-  \item optimisation par réduction de variance (variables antithétiques et variable de contrôle), comparaison de l'erreur quadratique moyenne, du gain de variance et du temps de calcul.
+  \item discrétisation du mouvement brownien géométrique (schéma exact et schéma d'Euler), Monte-Carlo standard (la « méthode de base »), avec des tirages gaussiens générés par la méthode de Box-Muller, et intervalle de confiance à 95\,\% pour $10^3\le N\le 10^6$ ;
+  \item optimisation par réduction de variance (variables antithétiques et variable de contrôle), comparaison de l'erreur quadratique moyenne, du gain de variance et du temps de calcul ;
+  \item option asiatique : simulation de la grille temporelle complète, prix, sensibilité à la fréquence $M$ et au nombre de trajectoires $N$.
 \end{enumerate}
 
 \paragraph{Organisation du rapport.}
 Le \textbf{chapitre 1} définit les options et les classe selon deux critères, en commençant par la forme du payoff.
 Le \textbf{chapitre 2} présente d'abord les \emph{modèles} du sous-jacent (dont Black-Scholes, démontré en détail), puis les \emph{méthodes} de valorisation, chacune expliquée et illustrée sur le call.
-Le \textbf{chapitre 3} réunit la simulation de Monte-Carlo et la réduction de variance, avec les démonstrations (dont celle du coefficient optimal $c^*$ de la variable de contrôle).
-Le \textbf{chapitre 4} explique le code partie par partie.
+Le \textbf{chapitre 3} réunit la discrétisation, la simulation de Monte-Carlo et la réduction de variance, avec les démonstrations (dont celle du coefficient optimal $c^*$ de la variable de contrôle).
+Le \textbf{chapitre 4} applique la méthode à l'option asiatique.
+Le \textbf{chapitre 5} explique le code partie par partie.
 L'\textbf{annexe A} indique où chaque remarque de l'encadrant a été traitée.
 
-\paragraph{Outils.} Le code est un notebook Jupyter Python (\texttt{numpy}, \texttt{scipy} et \texttt{matplotlib}) entièrement reproductible : le générateur aléatoire est fixé, et tous les nombres et figures de ce rapport sont produits par ce notebook. Paramètres de référence :
+\paragraph{Outils.} Le code est un notebook Jupyter Python (\texttt{numpy}, \texttt{scipy} et \texttt{matplotlib}) entièrement reproductible : chaque partie a son générateur aléatoire à graine fixée, et tous les nombres et figures de ce rapport sont produits par ce notebook. Paramètres de référence :
 \[
 S_0 = 100,\qquad K = 100,\qquad T = 1 \text{ an},\qquad r = 5\,\%,\qquad \sigma = 20\,\%.
 \]

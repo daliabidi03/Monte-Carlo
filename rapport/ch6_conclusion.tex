@@ -6,14 +6,16 @@
 \begin{itemize}
 \item \textbf{Modèle.} Le modèle de Black-Scholes a été résolu par le lemme d'Itô ; la loi log-normale de $S_T$ donne la formule exacte du call, $\CBS = 10{,}4506$, qui sert de référence.
 \item \textbf{Méthodes.} Chaque méthode de valorisation a été détaillée. Monte-Carlo est la plus lente sur ce cas simple, mais la seule dont l'erreur ne dépend pas de la dimension du problème.
-\item \textbf{Box-Muller.} Les tirages gaussiens sont fabriqués à partir d'uniformes par la formule $Z = \sqrt{-2\ln U_1}\cos(2\pi U_2)$, démontrée et vérifiée (moyenne $-0{,}0010$, variance $0{,}9987$).
-\item \textbf{Monte-Carlo de base.} L'estimateur retrouve $\CBS$ ($10{,}4370\pm0{,}0288$ pour $N = 10^6$, l'IC contient $\CBS$, erreur $0{,}0136$) et l'intervalle de confiance se resserre en $1/\sqrt N$.
-\item \textbf{Optimisation.} À budget égal, l'antithétique divise la variance par environ 2 ; la variable de contrôle $S_T$, avec $c^* = \Cov(Y,S_T)/\Var(S_T) = 0{,}6405$ (valeur analytique $0{,}6408$, erreur $0{,}00026$), la divise par 6,9. Répétée 50 fois à $N = 10^6$, c'est aussi la plus stable (erreur moyenne $0{,}0044$ contre $0{,}0127$ en standard) : c'est l'estimateur le plus précis et le plus efficace.
+\item \textbf{Box-Muller.} Les tirages gaussiens sont fabriqués à partir d'uniformes par la formule $Z = \sqrt{-2\ln U_1}\cos(2\pi U_2)$, démontrée et vérifiée (moyenne $-0{,}0014$, variance $1{,}0029$).
+\item \textbf{Discrétisation.} Le schéma exact simule la vraie loi de la trajectoire ; le schéma d'Euler a un biais qui décroît en $1/M$ ($-0{,}26$ sur le prix du call pour $M = 1$).
+\item \textbf{Monte-Carlo de base.} L'estimateur retrouve $\CBS$ ($10{,}4419\pm0{,}0288$ pour $N = 10^6$, l'IC contient $\CBS$, erreur $0{,}0087$) et l'intervalle de confiance se resserre en $1/\sqrt N$.
+\item \textbf{Optimisation.} À budget égal, l'antithétique divise la variance par environ 2 ; la variable de contrôle $S_T$, avec $c^* = \Cov(Y,S_T)/\Var(S_T) = 0{,}6413$ estimé sur un échantillon pilote (valeur analytique $0{,}6408$), la divise par 6,9. Sur 50 répétitions à $N = 10^6$, sa MSE est $3{,}5\cdot10^{-5}$ contre $2{,}2\cdot10^{-4}$ en standard : c'est l'estimateur le plus précis et le plus efficace.
+\item \textbf{Option asiatique.} Sans formule fermée, Monte-Carlo sur la grille complète donne le prix avec un intervalle de confiance : $6{,}1561\pm0{,}0005$ pour une moyenne mensuelle. Le prix diminue quand $M$ augmente (la moyenne lisse la volatilité) et tend vers $5{,}78$. Le call géométrique, qui a une formule fermée, est une variable de contrôle presque parfaite : il divise la variance par environ 1\,300.
 \end{itemize}
 
-\section*{Perspectives : la phase suivante}
+\section*{Perspectives}
 \begin{itemize}[nosep]
-\item Appliquer le simulateur validé ici à l'\textbf{option asiatique}, dont le payoff dépend de la moyenne des prix sur la trajectoire et qui n'a pas de formule fermée : simulation de la grille temporelle complète, sensibilité du prix au nombre de dates $M$ et au nombre de trajectoires $N$.
+\item Étendre le simulateur aux autres options dépendantes du chemin (barrière, lookback) : seule la fonction de payoff change.
 \item Combiner les méthodes de réduction de variance (antithétique et contrôle ensemble), ou utiliser des suites quasi-aléatoires (Sobol).
 \item Remplacer Black-Scholes par Heston ou Merton : le code Monte-Carlo reste le même, seule la simulation de $S_T$ change.
 \end{itemize}

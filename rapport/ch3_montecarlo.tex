@@ -21,9 +21,43 @@ Le prix est une espérance : $C = \E[Y]$ avec $Y = e^{-rT}(S_T-K)^+$ (on garde l
 \caption{Algorithme de Monte-Carlo en quatre étapes (méthode de base).}
 \end{figure}
 
+\section{Discrétisation du mouvement brownien géométrique}\label{sec:discr}
+
+Pour simuler une trajectoire, on découpe $[0,T]$ en $M$ pas de longueur $\Delta t = T/M$, aux dates $t_j = j\,\Delta t$, et on tire des $Z_1,\dots,Z_M\sim\Ncal(0,1)$ indépendants. Deux schémas sont possibles :
+\[
+\textbf{Euler :}\ S_{t_{j+1}} = S_{t_j}\big(1 + r\,\Delta t + \sigma\sqrt{\Delta t}\,Z_{j+1}\big),\qquad
+\textbf{exact :}\ S_{t_{j+1}} = S_{t_j}\exp\Big[\Big(r-\frac{\sigma^2}2\Big)\Delta t + \sigma\sqrt{\Delta t}\,Z_{j+1}\Big].
+\]
+Le schéma d'Euler remplace l'EDS par sa version discrète : il introduit un \emph{biais de discrétisation} d'ordre $\Delta t$. Le schéma exact applique sur chaque pas la solution log-normale du chapitre 2 : les accroissements $\ln(S_{t_{j+1}}/S_{t_j})$ sont indépendants de loi $\Ncal\big((r-\sigma^2/2)\Delta t,\ \sigma^2\Delta t\big)$, donc il simule \emph{exactement} la loi de $(S_{t_1},\dots,S_{t_M})$.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{rccc}
+\toprule
+$M$ & Euler & Exact & Écart Euler $-$ exact (IC 95 \%) \\
+\midrule
+1 & 10,2485 & 10,5041 & $-0{,}2556\pm0{,}0117$ \\
+2 & 10,3590 & 10,4539 & $-0{,}0949\pm0{,}0077$ \\
+4 & 10,3742 & 10,4101 & $-0{,}0360\pm0{,}0053$ \\
+12 & 10,4103 & 10,4223 & $-0{,}0121\pm0{,}0031$ \\
+52 & 10,4429 & 10,4448 & $-0{,}0019\pm0{,}0015$ \\
+\bottomrule
+\end{tabular}
+\caption{Prix du call avec les deux schémas, calculés avec les mêmes tirages ($N = 2\cdot10^5$).}
+\label{tab:euler}
+\end{table}
+
+Avec les mêmes tirages, l'écart entre les deux schémas isole le biais d'Euler : il est significatif pour $M$ petit et diminue environ comme $1/M$. \textbf{Choix du projet : le schéma exact.} Pour le call européen, seul $S_T$ compte : un seul pas ($M = 1$) suffit et donne $S_T$ sans erreur. La grille complète sert à l'option asiatique (chapitre~\ref{ch:asiatique}).
+
+\begin{figure}[H]
+\centering\includegraphics[width=0.75\textwidth]{fig_trajectoires_mbg}
+\caption{20 trajectoires simulées avec le schéma exact sur une grille quotidienne ($M = 252$).}
+\label{fig:mbg}
+\end{figure}
+
 \section{Étape 1 : générateur fixé et méthode de Box-Muller}\label{sec:bm}
 
-\paragraph{Le générateur est fixé.} Le générateur de NumPy produit des nombres \emph{uniformes} sur $[0,1[$ à partir d'une \emph{graine}. Avec la même graine, on obtient exactement la même suite de nombres : les résultats de ce rapport sont reproductibles à l'identique. Dans le code : \texttt{rng = np.random.default\_rng(2026)}, un seul générateur créé au début et utilisé par toutes les fonctions ; en exécutant le notebook du début à la fin, on retrouve exactement les mêmes chiffres.
+\paragraph{Le générateur est fixé.} Le générateur de NumPy produit des nombres \emph{uniformes} sur $[0,1[$ à partir d'une \emph{graine}. Avec la même graine, on obtient exactement la même suite de nombres : les résultats de ce rapport sont reproductibles à l'identique. Dans le code, chaque partie crée son propre générateur avec \texttt{generateur(partie)}, qui vaut \texttt{np.random.default\_rng(2026 + partie)} : une partie redonne toujours les mêmes chiffres, même si on l'exécute seule.
 
 \paragraph{La méthode de Box-Muller.} L'algorithme a besoin de tirages $Z\sim\Ncal(0,1)$, alors que le générateur ne donne que des uniformes. Nous les fabriquons avec la formule de Box-Muller :
 \[
@@ -51,7 +85,7 @@ f(x,y) = \frac{1}{2\pi}e^{-(x^2+y^2)/2} = \frac{e^{-x^2/2}}{\sqrt{2\pi}}\times\f
 
 \textbf{Exemple à la main.} $U_1 = 0{,}5$, $U_2 = 0{,}125$ : $Z = \sqrt{-2\ln0{,}5}\times\cos(\pi/4) = 1{,}1774\times0{,}7071 = 0{,}8326$.
 
-\textbf{Vérification sur un million de tirages.} Moyenne $-0{,}0010$ (théorie 0), variance $0{,}9987$ (théorie 1), $\Q(|Z|\le1{,}96) = 0{,}9503$ (théorie 0,95). L'histogramme suit la densité de $\Ncal(0,1)$ (figure~\ref{fig:bm}).
+\textbf{Vérification sur un million de tirages.} Moyenne $-0{,}0014$ (théorie 0), variance $1{,}0029$ (théorie 1), $\Q(|Z|\le1{,}96) = 0{,}9496$ (théorie 0,95). L'histogramme suit la densité de $\Ncal(0,1)$ (figure~\ref{fig:bm}).
 
 \begin{figure}[H]
 \centering\includegraphics[width=0.7\textwidth]{fig_box_muller}
@@ -86,9 +120,9 @@ On note $SE = s/\sqrt N$ l'\textbf{erreur standard} (l'écart-type de l'estimate
 
 \textbf{Avec $N = 10^6$ simulations :}
 \[
-\hat C_{MC} = 10{,}4370,\qquad SE = 0{,}01471,\qquad IC_{95\%} = [10{,}4081\ ;\ 10{,}4658],\qquad \CBS = 10{,}4506\in IC.
+\hat C_{MC} = 10{,}4419,\qquad SE = 0{,}01471,\qquad IC_{95\%} = [10{,}4130\ ;\ 10{,}4707],\qquad \CBS = 10{,}4506\in IC.
 \]
-\textbf{Erreur par rapport au prix analytique :} $|\CBS - \hat C_{MC}| = 0{,}013624$.
+\textbf{Erreur par rapport au prix analytique :} $|\CBS - \hat C_{MC}| = 0{,}0087$.
 
 \begin{figure}[H]
 \centering\includegraphics[width=0.82\textwidth]{fig_ic_vs_N}
@@ -96,7 +130,7 @@ On note $SE = s/\sqrt N$ l'\textbf{erreur standard} (l'écart-type de l'estimate
 \label{fig:icN}
 \end{figure}
 
-\textbf{Lecture.} Quand $N$ augmente, l'intervalle se resserre autour de $10{,}4506$ : c'est la convergence de Monte-Carlo. Pour les 25 valeurs de $N$, le prix exact est dans l'IC. La largeur suit la loi $1/\sqrt N$ : multiplier $N$ par 1\,000 divise l'IC par environ $\sqrt{1000}\approx31{,}6$.
+\textbf{Lecture.} Quand $N$ augmente, l'intervalle se resserre autour de $10{,}4506$ : c'est la convergence de Monte-Carlo. Le prix exact est dans l'IC pour 24 des 25 valeurs de $N$ (96 \%), ce qui correspond à ce qu'on attend d'un intervalle à 95 \%. La largeur suit la loi $1/\sqrt N$ : multiplier $N$ par 1\,000 divise l'IC par environ $\sqrt{1000}\approx31{,}6$.
 
 \subsection*{Prix pour les puissances de 10}
 \begin{table}[H]
@@ -105,17 +139,17 @@ On note $SE = s/\sqrt N$ l'\textbf{erreur standard} (l'écart-type de l'estimate
 \toprule
 $N$ & Prix MC & IC à 95 \% & Erreur $|\CBS - \hat C|$ \\
 \midrule
-10 & 11,9906 & [3,8810 ; 20,1002] & 1,5400 \\
-100 & 10,1197 & [7,1120 ; 13,1275] & 0,3309 \\
-1\,000 & 10,4897 & [9,5733 ; 11,4061] & 0,0391 \\
-10\,000 & 10,5740 & [10,2834 ; 10,8645] & 0,1234 \\
-100\,000 & 10,4234 & [10,3326 ; 10,5141] & 0,0272 \\
-1\,000\,000 & 10,4371 & [10,4083 ; 10,4660] & 0,0134 \\
+10 & 4,6026 & [0,3707 ; 8,8345] & 5,8480 \\
+100 & 10,6776 & [8,0131 ; 13,3421] & 0,2270 \\
+1\,000 & 10,4603 & [9,5641 ; 11,3565] & 0,0097 \\
+10\,000 & 10,5681 & [10,2796 ; 10,8567] & 0,1176 \\
+100\,000 & 10,4044 & [10,3136 ; 10,4952] & 0,0462 \\
+1\,000\,000 & 10,4639 & [10,4350 ; 10,4928] & 0,0133 \\
 \bottomrule
 \end{tabular}
 \caption{Monte-Carlo standard pour $N = 10^1, \dots, 10^6$.}
 \end{table}
-À chaque puissance de 10, l'IC est divisé par environ $\sqrt{10}\approx3{,}16$ et contient toujours $\CBS$. L'erreur d'une seule simulation dépend du hasard (elle est plus grande à $10^4$ qu'à $10^3$) ; c'est la largeur de l'IC qui diminue toujours.
+À chaque puissance de 10, l'IC est divisé par environ $\sqrt{10}\approx3{,}16$ et contient $\CBS$ à chaque ligne. L'erreur d'une seule simulation dépend du hasard (elle est plus grande à $10^4$ qu'à $10^3$) ; c'est la largeur de l'IC qui diminue toujours.
 
 \subsection*{Trajectoire de l'estimateur : stabilité}
 On suit la moyenne des $n$ premiers payoffs, $\hat C_n = \frac1n\sum_{i\le n}Y_i$, pour $n$ de 1 à $10^6$ (une seule simulation).
@@ -124,7 +158,7 @@ On suit la moyenne des $n$ premiers payoffs, $\hat C_n = \frac1n\sum_{i\le n}Y_i
 \caption{Trajectoire $\hat C_n$ et enveloppe $\CBS\pm1{,}96\,s/\sqrt n$.}
 \label{fig:traj}
 \end{figure}
-La moyenne bouge beaucoup au début ($\hat C_{1000} = 10{,}6402$), puis se stabilise dans l'enveloppe ($\hat C_{10^6} = 10{,}4308$) : c'est la loi des grands nombres.
+La moyenne bouge beaucoup au début ($\hat C_{1000} = 11{,}0351$), puis se stabilise dans l'enveloppe ($\hat C_{10^6} = 10{,}4482$) : c'est la loi des grands nombres.
 
 \section{Réduction de variance}\label{sec:rv}
 
@@ -151,7 +185,7 @@ Avec $N/2$ paires indépendantes : $\Var(\hat C_a) = \frac{\sigma_Y^2(1+\rho)}{N
 \textbf{Quand ça marche.} Il faut $\rho<0$. Le payoff du call augmente avec $Z$ : quand $Y^+$ est grand, $Y^-$ est petit, donc $\rho<0$.
 \end{demo}
 
-\textbf{Résultat ($N = 10^6$).} $\hat C_a = 10{,}4600$, $SE = 0{,}01039$ contre $0{,}01471$ en standard : gain de variance $(0{,}01471/0{,}01039)^2 = 2{,}00$, ce qui correspond à $\rho\approx-0{,}50$. Erreur par rapport au prix analytique : $|\CBS - \hat C_a| = 0{,}009445$.
+\textbf{Résultat ($N = 10^6$).} $\hat C_a = 10{,}4373$, $SE = 0{,}01035$ contre $0{,}01471$ en standard : gain de variance $(0{,}01471/0{,}01035)^2 = 2{,}02$. La corrélation mesurée vaut $\rho = -0{,}5007$, d'où un gain théorique $1/(1+\rho) = 2{,}00$ : la théorie et la simulation concordent. Erreur par rapport au prix analytique : $|\CBS - \hat C_a| = 0{,}0133$.
 
 \textbf{Pourquoi le gain n'est que de 2.} Le payoff du call est \emph{convexe} : il est nul quand $Z$ est négatif, puis croît comme une exponentielle. Quand $Z$ est grand, $Y^+$ est grand et $Y^- = 0$ : la paire ne se compense pas. La corrélation n'est que de $-0{,}5$, d'où un gain de 2.
 
@@ -182,100 +216,65 @@ et $g''(c) = 2\Var X>0$ : c'est bien un minimum.
 \]
 \end{demo}
 
-\paragraph{Calcul de $c$ pour le call.} Dans le code, $\Cov(Y,X)$ et $\Var(X)$ sont calculées sur les $N$ simulations (\texttt{np.cov} et \texttt{np.var}), puis $c^* = \Cov/\Var$ :
+\paragraph{Calcul de $c$ pour le call.} Dans le code, $\Cov(Y,X)$ et $\Var(X)$ sont calculées sur un \textbf{échantillon pilote indépendant} de $10^5$ simulations (\texttt{np.cov} et \texttt{np.var}), puis $c^* = \Cov/\Var$ :
 \[
-c^* = 0{,}640505.
+c^* = 0{,}641253.
 \]
 \textbf{Vérification par le calcul exact.} Avec la loi log-normale de $S_T$ on peut calculer $c^*$ exactement : $\E[S_T\1_{S_T>K}] = S_0e^{rT}N(d_1)$, $\E[S_T^2\1_{S_T>K}] = S_0^2e^{(2r+\sigma^2)T}N(d_1+\sigma\sqrt T)$, $\Var(S_T) = S_0^2e^{2rT}(e^{\sigma^2T}-1)$, puis $\Cov(Y,S_T) = e^{-rT}\big(\E[S_T^2\1_{S_T>K}] - K\,\E[S_T\1_{S_T>K}]\big) - \CBS\,\E[S_T]$. On obtient $c_{\text{analytique}} = 0{,}640762$.
 \[
-\text{Erreur sur } c :\quad |c_{\text{analytique}} - c^*| = 0{,}000257\ (0{,}04\ \%) : \text{la valeur simulée est juste.}
+\text{Erreur sur } c :\quad |c_{\text{analytique}} - c^*| = 0{,}000490\ (0{,}08\ \%) : \text{la valeur simulée est juste.}
 \]
 
-\textbf{Remarque.} Estimer $c$ sur les mêmes tirages que le prix crée un biais de l'ordre de $1/N$ ; avec $N = 10^6$ il est négligeable devant l'erreur standard.
+\textbf{Pourquoi un échantillon pilote ?} Si l'on estimait $c$ sur les mêmes tirages que le prix, $c$ et les $Y_i$ seraient dépendants, ce qui crée un petit biais d'ordre $1/N$. Avec un $c$ estimé sur des tirages indépendants, $c$ est une constante pour l'estimation du prix, et $\E[Y_c] = C$ exactement. Le coût du pilote ($10^5$ tirages, une seule fois) est négligeable.
 
-\textbf{Résultat ($N = 10^6$).} $\hat C_c = 10{,}4472$, $SE = 0{,}00562$, $IC_{95\%} = [10{,}4362\ ;\ 10{,}4582]$, qui contient $\CBS$, erreur $|\CBS - \hat C_c| = 0{,}003408$. Gain de variance $(0{,}01471/0{,}00562)^2 = 6{,}86$, ce qui correspond à $\rho_{XY}\approx0{,}92$.
+\textbf{Résultat ($N = 10^6$).} $\hat C_c = 10{,}4499$, $SE = 0{,}00561$, $IC_{95\%} = [10{,}4389\ ;\ 10{,}4609]$, qui contient $\CBS$, erreur $|\CBS - \hat C_c| = 0{,}0007$. Gain de variance $(0{,}01471/0{,}00561)^2 = 6{,}88$. La corrélation mesurée vaut $\rho_{XY} = 0{,}9248$, d'où un gain théorique $1/(1-\rho_{XY}^2) = 6{,}91$.
 
 \subsection{Comparaison : MSE, gain, temps et efficacité}
 
-Les trois estimateurs sont calculés avec le même budget ($N = 10^6$ payoffs). On compare :
+Les trois estimateurs sont calculés avec le même budget ($N = 10^6$ payoffs). Pour mesurer leur précision sans dépendre du hasard d'un seul calcul, on refait chaque calcul $R = 50$ fois avec de nouveaux tirages. On compare :
 \begin{itemize}[nosep]
-\item l'\textbf{erreur standard} $SE$ et l'\textbf{IC à 95 \%} ;
-\item la \textbf{MSE} : les trois estimateurs sont sans biais, donc $MSE = \E[(\hat C - C)^2] = \Var(\hat C) = SE^2$ ;
-\item le \textbf{gain de variance} $= SE_{MC}^2/SE^2$ : combien de fois moins de simulations il faut pour la même précision ;
-\item le \textbf{temps} de calcul et l'\textbf{efficacité} $= \text{gain}\times t_{MC}/t$ : le gain réel une fois le temps payé (temps moyen sur 5 exécutions).
+\item le \textbf{biais} $\bar C - \CBS$, où $\bar C$ est la moyenne des 50 prix ;
+\item l'\textbf{erreur quadratique moyenne empirique} $MSE = \frac{1}{50}\sum_{j=1}^{50}(\hat C_j - \CBS)^2 = \text{biais}^2 + \text{variance}$ ;
+\item l'\textbf{erreur standard} $SE$ d'un calcul et le \textbf{gain de variance} $= SE_{MC}^2/SE^2$ : combien de fois moins de simulations il faut pour la même précision ;
+\item le \textbf{temps} de calcul (médiane de 5 exécutions) et l'\textbf{efficacité} $= \text{gain}\times t_{MC}/t$ : le gain réel une fois le temps payé.
 \end{itemize}
+
+\begin{figure}[H]
+\centering\includegraphics[width=0.78\textwidth]{fig_stabilite_3}
+\caption{Les 50 prix de chaque méthode à $N = 10^6$ ; la ligne rouge est le prix exact.}
+\label{fig:stab}
+\end{figure}
 
 \begin{table}[H]
 \centering\small
-\begin{tabular}{lccccccc}
+\begin{tabular}{lcccccccc}
 \toprule
-Méthode & Prix & $SE$ & IC à 95 \% & MSE $=SE^2$ & Gain & Temps (s) & Efficacité \\
+Méthode & Moyenne & Biais & Écart-type & MSE & $SE$ & Gain & Temps (s) & Efficacité \\
 \midrule
-Standard & 10,4370 & 0,01471 & [10,4081 ; 10,4658] & 0,000216 & $\times1{,}00$ & 0,039 & $\times1{,}0$ \\
-Antithétique & 10,4600 & 0,01039 & [10,4397 ; 10,4804] & 0,000108 & $\times2{,}00$ & 0,022 & $\times3{,}5$ \\
-Contrôle & 10,4472 & 0,00562 & [10,4362 ; 10,4582] & 0,000032 & $\times6{,}86$ & 0,056 & $\times4{,}7$ \\
+Standard & 10,4539 & $+0{,}0033$ & 0,01475 & $2{,}24\cdot10^{-4}$ & 0,01473 & $\times1{,}00$ & 0,041 & $\times1{,}0$ \\
+Antithétique & 10,4499 & $-0{,}0007$ & 0,01138 & $1{,}27\cdot10^{-4}$ & 0,01041 & $\times2{,}00$ & 0,022 & $\times3{,}7$ \\
+Contrôle & 10,4521 & $+0{,}0016$ & 0,00581 & $3{,}54\cdot10^{-5}$ & 0,00561 & $\times6{,}90$ & 0,044 & $\times6{,}5$ \\
 \bottomrule
 \end{tabular}
-\caption{Comparaison à budget égal ($N = 10^6$). $\CBS = 10{,}4506$ est dans les trois IC. Les temps dépendent de la machine.}
+\caption{Comparaison à budget égal ($N = 10^6$ payoffs, 50 répétitions). $\CBS = 10{,}4506$. Les temps dépendent de la machine.}
 \label{tab:rv}
 \end{table}
 
 \textbf{Lecture.}
 \begin{itemize}[nosep]
-\item Les trois IC contiennent le prix exact : les trois méthodes sont correctes.
-\item L'antithétique divise la variance par 2, la variable de contrôle par 6,9 : l'IC du contrôle est 2,6 fois plus étroit que celui du standard.
-\item L'antithétique est même plus rapide (elle tire deux fois moins de gaussiennes). La variable de contrôle coûte un peu plus de temps, mais reste la plus efficace.
-\item \textbf{Quel estimateur choisir ?} Celui qui a la plus petite erreur standard : la \textbf{variable de contrôle}. On ne choisit pas sur l'écart $|\hat C - \CBS|$ d'une seule simulation : cet écart dépend du hasard, alors que $SE$ mesure la précision de la méthode.
+\item Les biais sont petits devant l'écart-type des 50 prix : les trois estimateurs sont sans biais, et la MSE est essentiellement la variance. L'écart-type des 50 prix est proche du $SE$ d'un seul calcul, ce qui confirme les intervalles de confiance.
+\item La variable de contrôle divise la MSE par plus de 6 : son IC est 2,6 fois plus étroit que celui du standard. L'antithétique divise la variance par 2.
+\item L'antithétique est la plus rapide (elle tire deux fois moins de gaussiennes), ce qui gonfle son efficacité. La variable de contrôle reste la plus efficace.
+\item \textbf{Quel estimateur choisir ?} Celui qui a la plus petite MSE : la \textbf{variable de contrôle}. On ne choisit pas sur l'écart $|\hat C - \CBS|$ d'une seule simulation, qui dépend du hasard.
 \end{itemize}
 
 \subsection{Courbe de comparaison des trois méthodes}
 \begin{figure}[H]
 \centering\includegraphics[width=0.82\textwidth]{fig_comparaison_3}
-\caption{Moyenne cumulée de chaque méthode en fonction du nombre de payoffs (même budget).}
+\caption{Moyenne cumulée de chaque méthode en fonction du nombre de payoffs (mêmes tirages, même budget).}
 \label{fig:cmp3}
 \end{figure}
 Les trois trajectoires convergent vers $\CBS$ ; celle de la variable de contrôle oscille le moins.
-
-\subsection{Prix pour les puissances de 10 : les trois méthodes}
-\begin{table}[H]
-\centering\small
-\begin{tabular}{rcccccc}
-\toprule
-$N$ & Standard & erreur & Antithétique & erreur & Contrôle & erreur \\
-\midrule
-10 & 8,3558 & 2,0948 & 4,7035 & 5,7471 & 12,4296 & 1,9790 \\
-100 & 7,6188 & 2,8318 & 10,2746 & 0,1760 & 10,9364 & 0,4858 \\
-1\,000 & 10,3919 & 0,0587 & 10,4630 & 0,0124 & 10,0182 & 0,4324 \\
-10\,000 & 10,2897 & 0,1609 & 10,4057 & 0,0448 & 10,5298 & 0,0793 \\
-100\,000 & 10,4781 & 0,0275 & 10,4207 & 0,0299 & 10,4459 & 0,0046 \\
-1\,000\,000 & 10,4486 & 0,0020 & 10,4693 & 0,0187 & 10,4516 & 0,0010 \\
-\bottomrule
-\end{tabular}
-\caption{Prix et erreur $|\CBS - \hat C|$ des trois méthodes pour $N = 10^1, \dots, 10^6$.}
-\end{table}
-Pour $N$ petit, il y a trop peu de tirages et le prix peut être loin de $\CBS$. Quand $N$ grandit, les trois prix s'en rapprochent. Une seule simulation ne suffit pas pour comparer la précision : on répète donc le calcul à $N$ fixé.
-
-\subsection{Stabilité des trois méthodes à $N = 10^6$ fixé}
-On refait le calcul $M = 50$ fois avec chaque méthode ($N = 10^6$, nouveaux tirages à chaque fois). L'\textbf{erreur moyenne} est $\frac{1}{50}\sum_{j=1}^{50}|\CBS - \hat C_j|$.
-\begin{figure}[H]
-\centering\includegraphics[width=0.78\textwidth]{fig_stabilite_3}
-\caption{Les 50 prix de chaque méthode ; la ligne rouge est le prix exact.}
-\label{fig:stab}
-\end{figure}
-\begin{table}[H]
-\centering\small
-\begin{tabular}{lccc}
-\toprule
-Méthode & Moyenne des 50 prix & Écart-type & \textbf{Erreur moyenne} \\
-\midrule
-Standard & 10,4512 & 0,01619 & \textbf{0,01265} \\
-Antithétique & 10,4517 & 0,01052 & \textbf{0,00800} \\
-Contrôle & 10,4507 & 0,00567 & \textbf{0,00440} \\
-\bottomrule
-\end{tabular}
-\caption{Stabilité à $N = 10^6$ fixé (50 répétitions).}
-\end{table}
-Les trois colonnes sont centrées sur $\CBS$ (pas de biais). La variable de contrôle est la plus stable : son erreur moyenne est environ 3 fois plus petite que celle du standard. L'écart-type des 50 prix est proche du $SE$ calculé une seule fois, ce qui confirme les intervalles de confiance.
 
 \subsection{La courbe de gain}
 

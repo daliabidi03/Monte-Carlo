@@ -1,0 +1,84 @@
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\IfFileExists{french.ldf}{%
+  \usepackage[french]{babel}%
+}{%
+  \usepackage[english]{babel}%
+  \addto\captionsenglish{%
+    \renewcommand{\contentsname}{Table des matières}%
+    \renewcommand{\listfigurename}{Table des figures}%
+    \renewcommand{\listtablename}{Liste des tableaux}%
+    \renewcommand{\chaptername}{Chapitre}%
+    \renewcommand{\figurename}{Figure}%
+    \renewcommand{\tablename}{Tableau}%
+    \renewcommand{\bibname}{Bibliographie}%
+    \renewcommand{\appendixname}{Annexe}}%
+}
+\usepackage[a4paper,margin=2.4cm,headheight=14pt]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{graphicx}
+\usepackage{booktabs,tabularx,array,multirow}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,babel}
+\usepackage[most]{tcolorbox}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage[colorlinks=true,linkcolor=bleu,urlcolor=bleu,citecolor=bleu]{hyperref}
+
+\definecolor{bleu}{RGB}{20,60,130}
+\definecolor{gris}{RGB}{245,246,248}
+\definecolor{vert}{RGB}{30,120,60}
+\definecolor{orange}{RGB}{200,100,20}
+
+\graphicspath{{../figures/}{figures/}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\renewcommand{\arraystretch}{1.25}
+\captionsetup{font=small,labelfont=bf}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+
+% En-têtes
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\nouppercase{\leftmark}}
+\fancyfoot[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[R]{\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+\ifdefined\chapter
+\titleformat{\chapter}[display]{\normalfont\bfseries\color{bleu}}{\large\chaptertitlename\ \thechapter}{6pt}{\LARGE}
+\titlespacing*{\chapter}{0pt}{-10pt}{18pt}
+\fi
+\titleformat{\section}{\normalfont\Large\bfseries\color{bleu}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+
+% Encadrés
+\newtcolorbox{demo}[1][]{colback=gris,colframe=bleu!60,boxrule=0.5pt,arc=2pt,left=6pt,right=6pt,top=4pt,bottom=4pt,title={\textbf{Démonstration#1}},fonttitle=\small,coltitle=white,colbacktitle=bleu!70}
+\newtcolorbox{retenir}{colback=vert!5,colframe=vert!70,boxrule=0.5pt,arc=2pt,left=6pt,right=6pt,top=4pt,bottom=4pt,title={\textbf{À retenir}},fonttitle=\small,coltitle=white,colbacktitle=vert!70}
+\newtcolorbox{question}[1]{colback=orange!5,colframe=orange!80,boxrule=0.5pt,arc=2pt,left=6pt,right=6pt,top=4pt,bottom=4pt,title={\textbf{Question : #1}},fonttitle=\small,coltitle=white,colbacktitle=orange!80}
+
+% Code
+\lstset{language=Python,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{bleu}\bfseries,
+  commentstyle=\color{vert}\itshape,stringstyle=\color{orange},numbers=left,numberstyle=\tiny\color{gray},
+  numbersep=6pt,frame=single,rulecolor=\color{gray!40},backgroundcolor=\color{gris},breaklines=true,
+  showstringspaces=false,tabsize=4,columns=fullflexible,keepspaces=true,
+  literate={é}{{\'e}}1 {è}{{\`e}}1 {à}{{\`a}}1 {ù}{{\`u}}1 {ê}{{\^e}}1 {ô}{{\^o}}1 {û}{{\^u}}1 {ç}{{\c c}}1
+           {î}{{\^i}}1 {â}{{\^a}}1 {É}{{\'E}}1 {À}{{\`A}}1 {σ}{{$\sigma$}}1 {²}{{$^2$}}1 {Δ}{{$\Delta$}}1
+           {−}{{-}}1 {√}{{$\surd$}}1 {μ}{{$\mu$}}1 {≈}{{$\approx$}}1 {∈}{{$\in$}}1 {±}{{$\pm$}}1 {→}{{$\to$}}1 {«}{{\guillemotleft}}1 {»}{{\guillemotright}}1}
+
+% Raccourcis
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\Corr}{\operatorname{Corr}}
+\newcommand{\Ncal}{\mathcal{N}}
+\newcommand{\1}{\mathbf{1}}
+\newcommand{\CBS}{C_{BS}}
+\newcommand{\vir}{{,}}

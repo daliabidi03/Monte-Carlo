@@ -1,0 +1,15 @@
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+rapport/*.pdf
+# Python / Jupyter
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store

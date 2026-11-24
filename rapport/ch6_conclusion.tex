@@ -1,0 +1,30 @@
+\chapter*{Conclusion et perspectives}
+\addcontentsline{toc}{chapter}{Conclusion et perspectives}
+\markboth{Conclusion et perspectives}{}
+
+\section*{Acquis}
+\begin{itemize}
+\item \textbf{Modèle.} Le modèle de Black-Scholes a été résolu par le lemme d'Itô ; la loi log-normale de $S_T$ donne la formule exacte du call, $\CBS = 10{,}4506$, qui sert de référence.
+\item \textbf{Méthodes.} Chaque méthode de valorisation a été détaillée. Monte-Carlo est la plus lente sur ce cas simple, mais la seule dont l'erreur ne dépend pas de la dimension du problème.
+\item \textbf{Box-Muller.} Les tirages gaussiens sont fabriqués à partir d'uniformes par la formule $Z = \sqrt{-2\ln U_1}\cos(2\pi U_2)$, démontrée et vérifiée (moyenne $-0{,}0010$, variance $0{,}9987$).
+\item \textbf{Monte-Carlo de base.} L'estimateur retrouve $\CBS$ ($10{,}4370\pm0{,}0288$ pour $N = 10^6$, l'IC contient $\CBS$, erreur $0{,}0136$) et l'intervalle de confiance se resserre en $1/\sqrt N$.
+\item \textbf{Optimisation.} À budget égal, l'antithétique divise la variance par environ 2 ; la variable de contrôle $S_T$, avec $c^* = \Cov(Y,S_T)/\Var(S_T) = 0{,}6405$ (valeur analytique $0{,}6408$, erreur $0{,}00026$), la divise par 6,9. Répétée 50 fois à $N = 10^6$, c'est aussi la plus stable (erreur moyenne $0{,}0044$ contre $0{,}0127$ en standard) : c'est l'estimateur le plus précis et le plus efficace.
+\end{itemize}
+
+\section*{Perspectives : la phase suivante}
+\begin{itemize}[nosep]
+\item Appliquer le simulateur validé ici à l'\textbf{option asiatique}, dont le payoff dépend de la moyenne des prix sur la trajectoire et qui n'a pas de formule fermée : simulation de la grille temporelle complète, sensibilité du prix au nombre de dates $M$ et au nombre de trajectoires $N$.
+\item Combiner les méthodes de réduction de variance (antithétique et contrôle ensemble), ou utiliser des suites quasi-aléatoires (Sobol).
+\item Remplacer Black-Scholes par Heston ou Merton : le code Monte-Carlo reste le même, seule la simulation de $S_T$ change.
+\end{itemize}
+
+\begin{thebibliography}{9}
+\addcontentsline{toc}{chapter}{Bibliographie}
+\bibitem{bs} F. Black et M. Scholes, \emph{The Pricing of Options and Corporate Liabilities}, Journal of Political Economy, 81(3), 637--654, 1973.
+\bibitem{merton} R. C. Merton, \emph{Theory of Rational Option Pricing}, Bell Journal of Economics and Management Science, 4(1), 141--183, 1973.
+\bibitem{glasserman} P. Glasserman, \emph{Monte Carlo Methods in Financial Engineering}, Springer, 2004.
+\bibitem{crr} J. Cox, S. Ross et M. Rubinstein, \emph{Option Pricing: A Simplified Approach}, Journal of Financial Economics, 7, 229--263, 1979.
+\bibitem{cm} P. Carr et D. Madan, \emph{Option Valuation Using the Fast Fourier Transform}, Journal of Computational Finance, 2(4), 61--73, 1999.
+\bibitem{lapeyre} B. Lapeyre, É. Pardoux et R. Sentis, \emph{Méthodes de Monte-Carlo pour les équations de transport et de diffusion}, Springer, 1998.
+\bibitem{ks} I. Karatzas et S. Shreve, \emph{Brownian Motion and Stochastic Calculus}, Springer, 2\textsuperscript{e} édition, 1991.
+\end{thebibliography}

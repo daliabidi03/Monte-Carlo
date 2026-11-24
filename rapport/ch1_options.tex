@@ -1,0 +1,130 @@
+\chapter{Les options : définition et classification}
+
+Ce chapitre répond à deux questions : qu'est-ce qu'une option, et comment la classer ? Il fixe le vocabulaire utilisé dans tout le rapport et justifie le choix de nos deux cas d'étude.
+
+\section{Qu'est-ce qu'une option ?}
+
+Une \textbf{option} est un contrat qui donne à son acheteur le \emph{droit}, sans obligation, d'acheter (\emph{call}) ou de vendre (\emph{put}) un actif sous-jacent à un prix fixé à l'avance, le \emph{strike} $K$, à une date déterminée, l'échéance $T$. L'acheteur paie une \textbf{prime} pour acquérir ce droit : c'est cette prime que l'on cherche à calculer. \textbf{Dans ce projet, nous étudions uniquement le call.}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[box/.style={draw=bleu,rounded corners,fill=gris,minimum width=3.3cm,minimum height=1.2cm,align=center,font=\small}]
+\node[box,fill=bleu!15,minimum width=5cm] (c) at (0,0) {\textbf{CONTRAT D'OPTION}};
+\node[box] (s) at (-4.4,-1.8) {Sous-jacent\\ \footnotesize actif support};
+\node[box] (k) at (0,-1.8) {Strike $K$\\ \footnotesize prix fixé};
+\node[box] (t) at (4.4,-1.8) {Échéance $T$\\ \footnotesize date limite};
+\draw[-{Latex}] (c) -- (s); \draw[-{Latex}] (c) -- (k); \draw[-{Latex}] (c) -- (t);
+\node[box,fill=vert!10] (call) at (-2.6,-3.8) {\textbf{Call} : droit d'acheter\\ payoff $\max(S_T-K,0)$};
+\node[box,fill=orange!10] (put) at (2.6,-3.8) {\textbf{Put} : droit de vendre\\ payoff $\max(K-S_T,0)$};
+\draw[-{Latex}] (k) -- (call); \draw[-{Latex}] (k) -- (put);
+\end{tikzpicture}
+\caption{Structure d'un contrat d'option et payoffs associés.}
+\end{figure}
+
+Le \emph{payoff} est ce que reçoit l'acheteur à l'échéance. Pour un call, si $S_T>K$ il achète à $K$ un actif qui vaut $S_T$ et gagne $S_T-K$ ; sinon il n'exerce pas et reçoit $0$.
+
+\section{Deux critères de classification}
+
+Au-delà du sens du droit (call ou put), une option se classe selon \textbf{deux critères indépendants}. Nous plaçons en premier le critère de la \emph{forme du payoff}, car c'est lui qui décide de la méthode de valorisation utilisable : formule exacte pour une option vanille, simulation pour une option dépendante du chemin.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{>{\bfseries}p{3.4cm}p{3.6cm}L}
+\toprule
+Critère & Types & Idée \\
+\midrule
+Critère 1 : forme du payoff & Vanille / Exotique & Vanille : le payoff ne dépend que de $S_T$. Exotique : règle plus complexe ; en particulier \emph{path-dependent} quand le payoff dépend de la trajectoire (moyenne, barrière, extremum). \\
+Critère 2 : instant d'exercice & Européenne / Bermudéenne / Américaine & Européenne : seulement à $T$. Bermudéenne : à des dates fixées à l'avance. Américaine : à tout instant jusqu'à $T$. \\
+\bottomrule
+\end{tabularx}
+\caption{Les deux critères de classification des options.}
+\label{tab:criteres}
+\end{table}
+
+\subsection{Critère 1 : la forme du payoff}
+
+Une option \textbf{vanille} a un payoff qui dépend du seul prix final $S_T$ : $(S_T-K)^+$ pour le call (on note $x^+ = \max(x,0)$). Une option \textbf{exotique} a un payoff plus riche. Le point décisif pour ce projet est la notion de \textbf{dépendance au chemin} :
+\begin{itemize}[nosep]
+\item si le payoff ne dépend que de $S_T$, il suffit de connaître la \emph{loi de $S_T$} pour calculer le prix (une seule variable aléatoire) ;
+\item si le payoff dépend de $S_{t_1},\dots,S_{t_M}$, il faut connaître la \emph{loi jointe} de toute la trajectoire : c'est un problème en dimension $M$, où les formules fermées disparaissent en général.
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{>{\bfseries}p{2.4cm}p{4.6cm}L}
+\toprule
+Famille & Payoff (call) & Particularité \\
+\midrule
+Vanille & $(S_T-K)^+$ & Dépend de $S_T$ seulement. Formule de Black-Scholes. \textbf{Notre cas d'étude.} \\
+Asiatique & $(A-K)^+$, $A = \frac1M\sum_{j=1}^M S_{t_j}$ & \emph{Path-dependent} : moyenne sur la trajectoire. Étudiée dans la phase suivante. \\
+À barrière & $(S_T-K)^+\1_{\{\max_t S_t < B\}}$ & \emph{Path-dependent} : s'annule si la barrière $B$ est franchie. \\
+Lookback & $S_T - \min_{t\le T}S_t$ & \emph{Path-dependent} : dépend de l'extremum atteint. \\
+Digitale & $\1_{\{S_T>K\}}$ & Payoff discontinu (tout ou rien). \\
+Panier & $\big(\sum_i w_iS_T^{(i)} - K\big)^+$ & Plusieurs sous-jacents. \\
+\bottomrule
+\end{tabularx}
+\caption{Options vanilles et principales familles d'options exotiques.}
+\end{table}
+
+\subsection{Critère 2 : l'instant d'exercice}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1cm,y=0.75cm]
+\foreach \y/\n in {2/Européenne,1/Bermudéenne,0/Américaine}{\node[left,font=\small] at (0,\y) {\n}; \draw[gray] (0.2,\y) -- (10,\y);}
+\fill[red] (10,2) circle (3pt);
+\foreach \x in {2.5,5,7.5,10} \fill[red] (\x,1) circle (3pt);
+\draw[red,line width=3pt] (0.2,0) -- (10,0);
+\draw[-{Latex}] (0.2,-0.8) -- (10.4,-0.8); \node[below] at (0.2,-0.8) {$t_0$}; \node[below] at (10,-0.8) {$T$};
+\end{tikzpicture}
+\caption{Instants d'exercice possibles (en rouge) : à $T$ seulement, à des dates discrètes, à tout instant.}
+\end{figure}
+
+Plus de liberté d'exercice vaut plus cher ; à payoff identique :
+\[
+V_{\text{européenne}} \le V_{\text{bermudéenne}} \le V_{\text{américaine}}.
+\]
+Pour un call sur un actif sans dividende, l'exercice anticipé n'est jamais optimal : le call américain vaut alors le call européen.
+
+\subsection{Croisement des deux critères}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{>{\bfseries}p{2.6cm}LL}
+\toprule
+ & Vanille & Exotique \\
+\midrule
+Européenne & \textbf{Call européen} (Black-Scholes) $\leftarrow$ \textbf{notre cas d'étude} & Asiatique (phase suivante), barrière, digitale \\
+Bermudéenne & Call ou put bermudéen, swaption bermudéenne & Variantes exotiques à dates d'exercice discrètes \\
+Américaine & Put américain sur action & Asiatique ou barrière américaine (rares) \\
+\bottomrule
+\end{tabularx}
+\caption{Croisement des deux critères : exemples.}
+\end{table}
+
+\textbf{Précision importante.} « Européenne » et « asiatique » ne s'opposent pas sur le même critère : « européenne » décrit l'\emph{instant d'exercice} (critère 2), « asiatique » décrit la \emph{forme du payoff} (critère 1). Une option asiatique peut donc être \emph{à exercice européen} tout en ayant un payoff qui porte sur une moyenne.
+
+\section{Notre cas d'étude : le call européen}
+
+Selon les deux critères, le call européen est une option \textbf{vanille} (critère 1) à \textbf{exercice européen} (critère 2). C'est le cas le plus simple, et c'est précisément ce qui en fait un bon banc d'essai :
+\begin{itemize}[nosep]
+\item son payoff $(S_T-K)^+$ ne dépend que de $S_T$, dont la loi est connue exactement dans le modèle de Black-Scholes ;
+\item il a donc un \textbf{prix exact}, $\CBS = 10{,}4506$ avec nos paramètres (chapitre 2) ;
+\item on peut ainsi mesurer exactement l'erreur de Monte-Carlo, vérifier l'intervalle de confiance et comparer objectivement les techniques de réduction de variance (chapitre 3).
+\end{itemize}
+Une fois la méthode validée sur ce cas, elle pourra être appliquée en toute confiance aux options sans formule fermée, comme l'option asiatique, dans la phase suivante du projet.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{>{\bfseries}p{3.2cm}L}
+\toprule
+Payoff & $(S_T-K)^+$ : on reçoit $S_T-K$ si $S_T>K$, sinon $0$ \\
+Exercice & Uniquement à l'échéance $T$ \\
+Dépend de & Prix final $S_T$ seulement \\
+Prix exact & Formule de Black-Scholes : $\CBS = 10{,}4506$ \\
+Rôle dans le projet & Référence pour valider et optimiser Monte-Carlo \\
+Usage typique & Spéculation à la hausse, couverture (actions, indices, devises) \\
+\bottomrule
+\end{tabularx}
+\caption{Fiche du call européen ($S_0=K=100$, $T=1$, $r=5\,\%$, $\sigma=20\,\%$).}
+\end{table}

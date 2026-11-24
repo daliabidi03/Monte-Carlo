@@ -1,0 +1,48 @@
+\documentclass[11pt,a4paper]{report}
+\input{preambule}
+
+\begin{document}
+
+%======================= PAGE DE GARDE =======================
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{minipage}{0.5\textwidth}\small Date : novembre 2026\end{minipage}%
+\begin{minipage}{0.5\textwidth}\raggedleft\small Année universitaire : 2026--2027\end{minipage}
+
+\vspace*{1.6cm}
+\begin{center}
+{\large\bfseries École Supérieure Privée d'Ingénierie et de Technologies (ESPRIT)}\\[0.3cm]
+{\normalsize Module : Mathématiques et Assurance}\\[2.2cm]
+{\Large Rapport de projet}\\[0.6cm]
+\rule{\textwidth}{1pt}\\[0.4cm]
+{\huge\bfseries\color{bleu} Modélisation et simulation de Monte-Carlo\\[0.2cm] pour la valorisation d'options financières}\\[0.3cm]
+\rule{\textwidth}{1pt}\\[0.6cm]
+{\large Le call européen : Black-Scholes, Monte-Carlo et réduction de variance}\\[2.4cm]
+\begin{minipage}[t]{0.45\textwidth}\centering
+\textbf{Élaboré par :}\\[0.2cm]
+Mohamed Derbel\\ Oumaima Mrabet\\ Tasnim Ghodbane\\ Adem Ben Ali\\ Mariem Hamouda
+\end{minipage}\hfill
+\begin{minipage}[t]{0.45\textwidth}\centering
+\textbf{Encadré par :}\\[0.2cm] M. Mohsen Chebbi
+\end{minipage}
+\end{center}
+\end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\listoffigures
+\listoftables
+\cleardoublepage
+\pagenumbering{arabic}
+
+\input{ch0_intro}
+\input{ch1_options}
+\input{ch2_modeles_methodes}
+\input{ch3_montecarlo}
+\input{ch5_code}
+\input{ch6_conclusion}
+
+\appendix
+\input{annexe_remarques}
+
+\end{document}

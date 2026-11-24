@@ -1,0 +1,41 @@
+\chapter{Réponses aux remarques de l'encadrant}
+
+Ce tableau indique, pour chaque remarque formulée sur la version précédente du rapport, ce qui a été modifié et où le trouver.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.6cm}L>{\raggedright\arraybackslash}p{2.6cm}}
+\toprule
+Remarque & Ce qui a été fait & Où \\
+\midrule
+Présenter les \textbf{modèles avant les méthodes} & Le chapitre 2 présente d'abord les modèles du sous-jacent (avec leurs EDS) et Black-Scholes en détail ; les méthodes viennent ensuite. & Chap.~2 \\
+\addlinespace
+\textbf{Détailler les méthodes}, pas seulement les comparer & Chaque méthode a sa sous-section : principe, équations, application au call européen, limites. Le tableau comparatif n'arrive qu'à la fin. & Chap.~2, §2.4 \\
+\addlinespace
+Le critère 2 devient le \textbf{critère 1} & La forme du payoff (vanille / exotique) est le critère 1 ; l'instant d'exercice devient le critère 2. & Chap.~1, tab.~\ref{tab:criteres} \\
+\addlinespace
+Se \textbf{concentrer sur le call européen}, pas de put & Tout le projet porte sur le call. L'option asiatique est reportée à la phase suivante. & Tout le rapport \\
+\addlinespace
+\textbf{Fixer le générateur} de nombres aléatoires & Un seul générateur \texttt{default\_rng(2026)} créé au début : en exécutant le notebook du début à la fin, on retrouve les mêmes chiffres. & §3.2 ; notebook, partie 1 \\
+\addlinespace
+Utiliser la \textbf{méthode de Box-Muller}, avec \textbf{un seul $Z$} & $Z = \sqrt{-2\ln U_1}\cos(2\pi U_2)$ : une seule gaussienne par couple d'uniformes. Démonstration, exemple à la main, vérification sur un million de tirages. & §3.2 ; fig.~\ref{fig:bm} \\
+\addlinespace
+\textbf{Méthode de base, puis optimiser} ; simulation de $C$ ($S_0$, exponentielle) & Monte-Carlo standard en 4 étapes ($Z$, $S_T = S_0\exp(\dots)$, payoff, moyenne), puis antithétique et variable de contrôle. & §3.1, §3.4, §3.5 \\
+\addlinespace
+Monte-Carlo et réduction de variance dans \textbf{la même section} & Un seul chapitre : méthode de base, puis réduction de variance, puis comparaison. & Chap.~3 \\
+\addlinespace
+\textbf{Démontrer comment on trouve $c$} et \textbf{le calculer dans le code} & Démonstration : variance quadratique en $c$, dérivée nulle, $c = \Cov/\Var$, minimum. Le code calcule $c^* = \Cov(Y,X)/\Var(X) = 0{,}640505$ ; le calcul analytique donne $0{,}640762$, erreur $|c_{\text{analytique}} - c^*| = 0{,}000257$. & §3.5.2 ; notebook, partie 6 \\
+\addlinespace
+Expliquer pourquoi l'\textbf{antithétique est la plus basse} et \textbf{pourquoi la courbe de gain} & Gain $= 1/(1+\rho)$ avec $\rho\approx-0{,}50$, contre $1/(1-\rho^2)$ avec $\rho\approx0{,}92$ ; courbe de gain : droites parallèles et gain constant en $N$. & §3.5.4 ; fig.~\ref{fig:gain} \\
+\addlinespace
+Un \textbf{code simple et propre}, sans éléments en trop & Paramètres en variables simples (\texttt{S0}, \texttt{K}, \texttt{T}, \texttt{r}, \texttt{sigma} : pas de \texttt{o.T}), formules de $S_T$ et du payoff écrites directement dans chaque fonction (sans fonction intermédiaire), seulement ce que demande l'énoncé, en 9 parties courtes. Le meilleur estimateur est choisi sur l'erreur standard, pas sur l'écart d'une seule simulation. & Chap.~4 ; notebook \\
+\addlinespace
+\textbf{Erreur} par rapport à la valeur analytique, en valeur absolue & $|c_{\text{analytique}} - c^*|$ pour $c$, et $|\CBS - \hat C|$ pour le prix des trois méthodes. & §3.4, §3.5 \\
+\addlinespace
+\textbf{Puissances de $N$}, \textbf{trajectoire} et \textbf{stabilité} & Tableaux pour $N = 10, \dots, 10^6$ ; trajectoire $\hat C_n$ ; courbe de comparaison des trois méthodes ; 50 répétitions à $N = 10^6$ fixé avec l'erreur moyenne. & §3.4, §3.5 \\
+\bottomrule
+\end{tabularx}
+\caption{Correspondance entre les remarques et les corrections.}
+\end{table}
+
+\textbf{Autres corrections.} L'ancien chapitre 2, qui répétait le chapitre 1, a été fusionné dans le chapitre 3. Le code LaTeX cassé (listing illisible) a été remplacé. Le terme « projet de fin d'études » a été corrigé (projet du module Mathématiques et Assurance). La bibliographie n'apparaît plus qu'une fois. L'annonce du plan correspond maintenant aux chapitres réels. Les nombres du rapport proviennent tous du notebook final, ce qui corrige les incohérences entre l'ancien tableau 1.9 et l'ancien tableau 2.3.

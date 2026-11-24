@@ -1,0 +1,185 @@
+\chapter{Valoriser une option : d'abord le modèle, ensuite la méthode}
+
+\section{Principe commun : l'espérance risque-neutre}
+
+Évaluer une option, c'est calculer l'\textbf{espérance actualisée de son payoff sous la probabilité risque-neutre} $\Q$ :
+\[
+V_0 = e^{-rT}\,\E_\Q[\text{Payoff}].
+\]
+Deux ingrédients, à ne pas confondre, interviennent \emph{dans cet ordre} :
+\begin{enumerate}[nosep]
+\item \textbf{le modèle} dit \emph{comment évolue le prix du sous-jacent} (volatilité constante ou aléatoire, sauts\dots) ; il fixe la loi de $S_T$ ou de la trajectoire, donc ce que vaut l'espérance ;
+\item \textbf{la méthode} dit \emph{comment on calcule numériquement cette espérance} une fois le modèle choisi (formule, EDP, arbre, simulation\dots).
+\end{enumerate}
+On choisit donc toujours le modèle d'abord : sans modèle, il n'y a pas d'espérance à calculer. Une même méthode (Monte-Carlo) peut servir pour tous les modèles, et un même modèle (Black-Scholes) peut être traité par toutes les méthodes.
+
+\section{Les modèles du sous-jacent}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{>{\bfseries}p{2.7cm}p{6.2cm}L}
+\toprule
+Modèle & Dynamique sous $\Q$ & Prix du call européen \\
+\midrule
+Black-Scholes (GBM) & $dS_t = rS_tdt + \sigma S_tdW_t$ & Formule fermée \\
+Volatilité locale (Dupire) & $dS_t = rS_tdt + \sigma(t,S_t)S_tdW_t$ & EDP ou Monte-Carlo \\
+Heston & $dS_t = rS_tdt + \sqrt{v_t}S_tdW^1_t$,\ \ $dv_t = \kappa(\theta-v_t)dt + \xi\sqrt{v_t}dW^2_t$ & Semi-fermée (Fourier) \\
+Merton (sauts) & $\frac{dS_t}{S_{t^-}} = (r-\lambda\kappa)dt + \sigma dW_t + (J-1)dN_t$ & Série de prix BS \\
+Vasicek / CIR & taux court $dr_t = a(b-r_t)dt + \sigma_r r_t^{\gamma}dW_t$ & Hors cadre (options sur taux) \\
+\bottomrule
+\end{tabularx}
+\caption{Modèles de dynamique du sous-jacent et méthodes disponibles.}
+\label{tab:modeles}
+\end{table}
+
+\begin{itemize}[nosep]
+\item \textbf{Black-Scholes} : volatilité constante, trajectoires continues. C'est le modèle le plus simple et le seul qui donne une formule fermée pour l'européenne. \emph{C'est notre cadre.}
+\item \textbf{Dupire} : la volatilité dépend du temps et du prix, ce qui permet de reproduire exactement les prix d'options observés sur le marché.
+\item \textbf{Heston} : la variance $v_t$ est elle-même aléatoire (retour à la moyenne $\theta$ à la vitesse $\kappa$, volatilité de la volatilité $\xi$) ; elle explique le « smile » de volatilité.
+\item \textbf{Merton} : ajoute des sauts (processus de Poisson $N_t$ d'intensité $\lambda$, amplitude $J$) pour représenter les krachs.
+\item \textbf{Vasicek / CIR} : modèles de \emph{taux} d'intérêt, hors de notre cadre (taux $r$ constant).
+\end{itemize}
+Quel que soit le modèle, Monte-Carlo s'applique de la même façon : seule la simulation de $S_T$ change. Nous n'implémentons que Black-Scholes, que nous détaillons maintenant.
+
+\section{Le modèle de Black-Scholes : le prix exact de référence}
+
+\subsection{L'équation différentielle stochastique}
+Sous la mesure risque-neutre, le prix du sous-jacent suit le mouvement brownien géométrique
+\[
+dS_t = r\,S_t\,dt + \sigma\,S_t\,dW_t ,\qquad S_0 \text{ donné},
+\]
+où $W$ est un mouvement brownien : $W_0=0$, trajectoires continues, accroissements indépendants et $W_t-W_s\sim\Ncal(0,t-s)$. Le terme $rS_tdt$ est la tendance (taux sans risque) et $\sigma S_tdW_t$ le bruit (volatilité $\sigma$).
+
+\subsection{Existence et unicité}
+Les coefficients $a(x) = rx$ et $b(x) = \sigma x$ sont lipschitziens et à croissance linéaire :
+$|a(x)-a(y)| \le r|x-y|$, $|b(x)-b(y)|\le\sigma|x-y|$, $|a(x)|+|b(x)|\le (r+\sigma)(1+|x|)$.
+Le théorème d'existence et d'unicité des EDS garantit donc une solution forte unique, continue, pour tout $S_0$.
+\emph{Probabilité réelle ou risque-neutre ?} Sous la probabilité réelle la tendance est $\mu$ ; pour valoriser, le théorème de Girsanov permet de passer à $\Q$ sous laquelle la tendance devient $r$.
+
+\subsection{Résolution : la loi log-normale}
+\begin{demo}[ — solution de l'EDS par le lemme d'Itô]
+On pose $X_t = \ln S_t$, soit $f(s)=\ln s$, $f'(s) = 1/s$, $f''(s) = -1/s^2$. Le lemme d'Itô donne
+\[
+dX_t = f'(S_t)dS_t + \tfrac12f''(S_t)(dS_t)^2 = \frac{dS_t}{S_t} - \frac{(dS_t)^2}{2S_t^2}.
+\]
+Comme $(dW_t)^2 = dt$ et $dt\,dW_t = (dt)^2 = 0$, on a $(dS_t)^2 = \sigma^2S_t^2dt$, d'où
+\[
+dX_t = \Big(r-\frac{\sigma^2}{2}\Big)dt + \sigma dW_t.
+\]
+Les coefficients étant constants, on intègre entre $0$ et $T$, puis on écrit $W_T = \sqrt T Z$ avec $Z\sim\Ncal(0,1)$ :
+\[
+\boxed{S_T = S_0\exp\Big[\Big(r-\frac{\sigma^2}2\Big)T + \sigma\sqrt T\,Z\Big]}
+\qquad\Longrightarrow\qquad \ln S_T\sim\Ncal\Big(\ln S_0+\Big(r-\frac{\sigma^2}2\Big)T,\ \sigma^2T\Big).
+\]
+\end{demo}
+
+$S_T$ est donc \textbf{log-normale}. Le terme $-\sigma^2/2$ est la \emph{correction d'Itô} : comme $\E[e^{aZ}] = e^{a^2/2}$, on obtient
+$\E[S_T] = S_0e^{(r-\sigma^2/2)T}e^{\sigma^2T/2} = S_0e^{rT}$. L'actif actualisé $e^{-rt}S_t$ est d'espérance constante (c'est une martingale) : c'est la propriété qui définit la mesure risque-neutre.
+
+\subsection{La formule de Black-Scholes}
+\begin{demo}[ — formule du call européen]
+On veut $C = e^{-rT}\E[(S_T-K)^+]$.
+
+\emph{a) Événement d'exercice.} $S_T>K \iff Z>-d_2$, avec $d_2 = \dfrac{\ln(S_0/K)+(r-\sigma^2/2)T}{\sigma\sqrt T}$. Donc $\Q(S_T>K) = N(d_2)$.
+
+\emph{b) Découpage.} $\E[(S_T-K)^+] = \E[S_T\1_{\{Z>-d_2\}}] - K\,N(d_2)$.
+
+\emph{c) Premier terme : on complète le carré.} En utilisant $\sigma\sqrt Tz - \frac{z^2}{2} = -\frac12(z-\sigma\sqrt T)^2 + \frac{\sigma^2T}{2}$ :
+\[
+\E[S_T\1_{\{Z>-d_2\}}] = S_0e^{(r-\frac{\sigma^2}{2})T}\!\int_{-d_2}^{\infty}\! e^{\sigma\sqrt Tz}\frac{e^{-z^2/2}}{\sqrt{2\pi}}dz
+= S_0e^{rT}\!\int_{-d_2}^{\infty}\!\frac{e^{-(z-\sigma\sqrt T)^2/2}}{\sqrt{2\pi}}dz = S_0e^{rT}N(d_2+\sigma\sqrt T).
+\]
+\emph{d) Conclusion.} Avec $d_1 = d_2+\sigma\sqrt T$ :
+\[
+\boxed{\CBS = S_0N(d_1) - Ke^{-rT}N(d_2)},\qquad d_1 = \frac{\ln(S_0/K)+(r+\sigma^2/2)T}{\sigma\sqrt T},\quad d_2 = d_1-\sigma\sqrt T.
+\]
+\end{demo}
+
+$N(\cdot)$ est la fonction de répartition de $\Ncal(0,1)$ et $N(d_2)$ la probabilité risque-neutre de finir dans la monnaie.
+
+\textbf{Exemple chiffré (référence de tout le projet).} $d_1 = (0 + 0{,}07)/0{,}2 = 0{,}35$, $d_2 = 0{,}15$, $N(d_1)\approx 0{,}6368$, $N(d_2)\approx0{,}5596$ :
+\[
+\CBS = 100\times0{,}6368 - 100\,e^{-0{,}05}\times0{,}5596 = \mathbf{10{,}4506}.
+\]
+
+
+\subsection{L'EDP de Black-Scholes et la formule de Feynman-Kac}
+Le prix $V(t,S)$ vérifie aussi une équation aux dérivées partielles. En appliquant Itô à $e^{-rt}V(t,S_t)$, qui doit être une martingale sous $\Q$, le terme en $dt$ doit s'annuler :
+\[
+\frac{\partial V}{\partial t} + \frac12\sigma^2S^2\frac{\partial^2V}{\partial S^2} + rS\frac{\partial V}{\partial S} - rV = 0,\qquad V(T,S) = (S-K)^+.
+\]
+Réciproquement, la \textbf{formule de Feynman-Kac} dit que la solution de cette EDP s'écrit comme une espérance :
+$V(t,S) = e^{-r(T-t)}\E_\Q[(S_T-K)^+\mid S_t = S]$.
+\emph{Résoudre l'EDP (analyse) et calculer l'espérance (probabilités) sont donc deux façons de résoudre le même problème} : c'est ce qui justifie les différentes méthodes ci-dessous.
+
+\section{Les méthodes de valorisation}
+
+Le modèle étant fixé, il reste à calculer l'espérance. Nous détaillons chaque méthode : principe, mise en œuvre, application au call européen, limites.
+
+\subsection{Formule fermée}
+\textbf{Principe.} Calculer l'intégrale exactement, comme dans la démonstration ci-dessus.
+\textbf{Call européen :} oui, c'est $\CBS$, instantanée et exacte.
+\textbf{Limite :} n'existe que dans des cas très particuliers (modèle simple, payoff qui ne dépend que de $S_T$). Dès que le payoff dépend de toute la trajectoire, il n'y a en général plus de formule.
+
+\subsection{EDP et différences finies}
+\textbf{Principe.} On résout numériquement l'EDP de Black-Scholes sur une grille $S_i = i\Delta S$ ($0\le i\le n_S$, $S_{\max} = 2K$), $t_n = n\Delta t$ ($0\le n\le n_t$), en partant de la condition finale $V(T,S) = (S-K)^+$ et en remontant le temps. Les dérivées sont remplacées par des différences :
+\[
+\frac{\partial V}{\partial S}\approx\frac{V_{i+1}-V_{i-1}}{2\Delta S},\qquad \frac{\partial^2V}{\partial S^2}\approx\frac{V_{i+1}-2V_i+V_{i-1}}{\Delta S^2}.
+\]
+\textbf{Schéma implicite.} Ces dérivées sont prises au temps inconnu $t_n$, ce qui donne à chaque pas un système tridiagonal
+\[
+a_iV^n_{i-1} + b_iV^n_i + c_iV^n_{i+1} = V^{n+1}_i,\quad a_i = \tfrac{\Delta t}{2}(ri - \sigma^2i^2),\ b_i = 1+\Delta t(\sigma^2i^2+r),\ c_i = -\tfrac{\Delta t}{2}(\sigma^2i^2+ri),
+\]
+avec les conditions aux bords $V(t,0)=0$ et $V(t,S_{\max}) = S_{\max}-Ke^{-r(T-t)}$. On le résout en $O(n_S)$ opérations par l'algorithme de Thomas. Le schéma implicite est inconditionnellement stable (contrairement au schéma explicite, qui impose $\Delta t \lesssim \Delta S^2/(\sigma^2S_{\max}^2)$).
+
+
+\textbf{Atout :} l'erreur diminue quand on affine la grille, et en dimension 1 l'EDP est \emph{plus efficace} que Monte-Carlo.
+\textbf{Limite :} \emph{malédiction de la dimension} : avec $d$ variables d'état (plusieurs sous-jacents, volatilité aléatoire, payoff dépendant du chemin\dots) et $n$ points par axe, la grille a $n^d$ nœuds.
+
+\subsection{Arbre binomial de Cox-Ross-Rubinstein}
+\textbf{Principe.} On découpe $[0,T]$ en $n$ pas. À chaque pas, le prix est multiplié par $u = e^{\sigma\sqrt{\Delta t}}$ ou par $d = 1/u$. La probabilité de hausse
+\[
+p = \frac{e^{r\Delta t}-d}{u-d}
+\]
+est choisie pour que $\E[S_{t+\Delta t}\mid S_t] = S_te^{r\Delta t}$ (neutralité au risque). On calcule les payoffs aux $n+1$ feuilles, puis on remonte : $V = e^{-r\Delta t}\big(pV_{\text{haut}}+(1-p)V_{\text{bas}}\big)$. Quand $n\to\infty$, la loi de $S_T$ dans l'arbre tend vers la log-normale (théorème central limite) et le prix tend vers $\CBS$.
+
+
+\textbf{Atouts :} très intuitif, et c'est la méthode naturelle pour les options \emph{américaines} (à chaque nœud on compare la valeur de continuation à la valeur d'exercice).
+\textbf{Limite :} convergence lente et oscillante en $O(1/n)$ ; et si le payoff dépend du chemin, l'arbre ne se « recombine » plus et il faut suivre les $2^n$ chemins.
+
+\subsection{Monte-Carlo}
+\textbf{Principe.} Remplacer l'espérance par une moyenne de payoffs simulés (loi des grands nombres), et mesurer l'erreur par un intervalle de confiance (théorème central limite). La méthode est détaillée au chapitre 3.
+\textbf{Call européen :} oui ; ici la formule exacte permet de mesurer précisément son erreur.
+\textbf{Atout :} l'erreur reste en $\sigma_X/\sqrt N$ \emph{quelle que soit la dimension} du problème, et la méthode s'adapte à n'importe quel modèle ou payoff.
+\textbf{Limite :} convergence lente en $1/\sqrt N$, d'où la réduction de variance.
+
+\subsection{Transformée de Fourier (Carr-Madan)}
+\textbf{Principe.} Si l'on connaît la fonction caractéristique $\varphi(u) = \E[e^{iu\ln S_T}]$ (c'est le cas pour Black-Scholes, Heston, Merton), le prix d'un call amorti $e^{\alpha k}C(k)$, $k = \ln K$, a une transformée de Fourier explicite :
+\[
+\psi(v) = \frac{e^{-rT}\varphi\big(v-(\alpha+1)i\big)}{\alpha^2+\alpha-v^2+i(2\alpha+1)v},\qquad C(k) = \frac{e^{-\alpha k}}{\pi}\int_0^\infty \Re\big(e^{-ivk}\psi(v)\big)\,dv,
+\]
+calculée pour tous les strikes en une seule FFT.
+\textbf{Call européen :} oui, si $\varphi$ est connue ; très rapide pour calibrer un modèle sur de nombreux strikes.
+\textbf{Limite :} exige une fonction caractéristique connue, et ne s'applique qu'aux payoffs qui dépendent de $S_T$ seulement.
+
+\subsection{Synthèse comparative}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{>{\bfseries}p{2.6cm}LLL}
+\toprule
+Méthode & Call européen & Atout & Limite principale \\
+\midrule
+Formule fermée & Oui : Black-Scholes, exacte & Instantanée & Cas très particuliers \\
+EDP (différences finies) & Oui, converge vers $\CBS$ & Très efficace en dimension 1 & Malédiction de la dimension \\
+Arbre CRR & Oui, converge en $O(1/n)$ & Intuitif, options américaines & Lent, oscillant en $O(1/n)$ \\
+Monte-Carlo & Oui, IC $\pm0{,}029$ ($N=10^6$) & Indépendant de la dimension & Erreur en $1/\sqrt N$ \\
+Fourier (Carr-Madan) & Oui si $\varphi$ connue & Tous les strikes en une FFT & Exige $\varphi$ \\
+\bottomrule
+\end{tabularx}
+\caption{Synthèse des méthodes de valorisation appliquées au call européen.}
+\end{table}
+
+\begin{retenir}
+Pour le call européen, toutes les méthodes fonctionnent et la formule fermée est imbattable : elle sert de \emph{référence}. Monte-Carlo est la plus lente ici, mais c'est la seule dont l'erreur ne dépend pas de la dimension du problème. D'où notre démarche : \textbf{valider et optimiser Monte-Carlo sur le call européen}, là où l'on connaît la bonne réponse.
+\end{retenir}

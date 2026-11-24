@@ -1,0 +1,392 @@
+\documentclass[11pt,a4paper]{article}
+\input{preambule}
+\geometry{margin=2cm}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small Explication du code — Monte-Carlo pour le call européen}\fancyhead[R]{\small\thepage}
+\titleformat{\section}{\normalfont\large\bfseries\color{bleu}}{}{0em}{}
+\setcounter{secnumdepth}{0}
+
+\newcommand{\quoi}[1]{\par\noindent\textbf{\color{bleu}Ce que fait cette partie.}\enspace #1\par}
+\newcommand{\source}[1]{\par\noindent\textbf{\color{orange}D'où ça vient.}\enspace #1\par}
+\newcommand{\calcul}[1]{\par\noindent\textbf{\color{bleu}Comment c'est calculé.}\enspace #1\par}
+\newcommand{\resultat}[1]{\par\noindent\textbf{\color{vert}Résultat.}\enspace #1\par}
+\newcommand{\prof}[2]{\begin{tcolorbox}[colback=orange!6,colframe=orange!80,boxrule=0.4pt,arc=2pt,left=5pt,right=5pt,top=2pt,bottom=2pt]\small\textbf{Q :} #1\\[1pt]\textbf{R :} #2\end{tcolorbox}}
+\newcommand{\sect}[1]{\clearpage\section{#1}}
+
+\begin{document}
+
+\begin{center}
+{\LARGE\bfseries\color{bleu} Explication du code, partie par partie}\\[4pt]
+{\large Monte-Carlo, Box-Muller et réduction de variance pour le call européen}\\[2pt]
+{\small Fichier : \texttt{Projet\_MonteCarlo\_Call.ipynb} — Projet Math et Assurance, ESPRIT 2026–2027}
+\end{center}
+
+\begin{tcolorbox}[colback=gris,colframe=bleu!50,boxrule=0.4pt]
+\small\textbf{Comment lire ce document.} Le notebook a 9 parties. Pour chacune : le code exact, \textbf{ce qu'il fait}, \textbf{d'où vient la formule}, \textbf{comment le nombre est calculé}, \textbf{le résultat}, et en orange \textbf{les questions que le professeur peut poser, avec la réponse}.
+Paramètres : $S_0 = 100$, $K = 100$, $T = 1$ an, $r = 5\,\%$, $\sigma = 20\,\%$, $N = 10^6$ simulations.
+\end{tcolorbox}
+
+\subsection*{Le projet en 5 phrases}
+\begin{enumerate}[nosep]
+\item Le prix d'un call est une \textbf{espérance} : $C = e^{-rT}\,\E[\max(S_T-K,0)]$.
+\item Pour le call européen, cette espérance a une \textbf{formule exacte} (Black-Scholes) : $C = 10{,}4506$.
+\item \textbf{Monte-Carlo} remplace l'espérance par une \textbf{moyenne} de $N$ payoffs simulés. Les tirages gaussiens sont fabriqués par \textbf{Box-Muller}.
+\item On vérifie que Monte-Carlo retrouve $10{,}4506$, avec un intervalle de confiance à 95 \%.
+\item On réduit l'erreur avec deux méthodes (\textbf{antithétique}, \textbf{variable de contrôle}) et on les compare à budget égal.
+\end{enumerate}
+
+\tableofcontents
+
+%==================================================================
+\sect{1. Imports et paramètres}
+\begin{lstlisting}
+import time
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import norm
+
+S0    = 100.0      # prix de l'action aujourd'hui
+K     = 100.0      # prix d'exercice (strike)
+T     = 1.0        # maturité : 1 an
+r     = 0.05       # taux sans risque
+sigma = 0.20       # volatilité
+N     = 1_000_000  # nombre de simulations
+
+rng = np.random.default_rng(2026)   # générateur fixé par une graine
+z95 = 1.96                          # P(|Z| <= 1.96) = 95 %
+\end{lstlisting}
+\quoi{Charge les bibliothèques et écrit les paramètres une seule fois. \texttt{numpy} fait les calculs sur des tableaux entiers, \texttt{matplotlib} trace les graphiques, \texttt{scipy.stats.norm} donne la loi normale, \texttt{time} mesure les temps de calcul.}
+\source{\texttt{default\_rng(2026)} crée le générateur de nombres aléatoires de NumPy (algorithme PCG64) à partir d'une \emph{graine} : 2026. Un ordinateur ne fait pas de vrai hasard ; il calcule une suite de nombres à partir de la graine.}
+\calcul{\texttt{z95 = 1,96} est le quantile de la loi normale : $\Q(-1{,}96\le Z\le1{,}96) = 95\,\%$.}
+\prof{Pourquoi fixer la graine ?}{Pour que les résultats soient reproductibles : même graine, mêmes nombres, donc les mêmes chiffres que dans le rapport à chaque exécution.}
+\prof{Pourquoi un seul générateur \texttt{rng} pour tout le notebook ?}{C'est le plus simple : il est créé une fois, et chaque appel prend les nombres suivants de la même suite. En exécutant le notebook du début à la fin, on obtient toujours les mêmes résultats.}
+
+%==================================================================
+\sect{2. Méthode de Box-Muller}
+\begin{lstlisting}
+def box_muller(n, rng):
+    U1 = 1.0 - rng.random(n)        # uniforme sur ]0,1]
+    U2 = rng.random(n)              # uniforme sur [0,1[
+    return np.sqrt(-2.0 * np.log(U1)) * np.cos(2.0 * np.pi * U2)
+\end{lstlisting}
+\quoi{Fabrique $n$ tirages $Z\sim\Ncal(0,1)$ à partir de nombres uniformes. Toutes les simulations du projet utilisent cette fonction.}
+\source{Le générateur ne donne que des uniformes sur $[0,1[$, alors que $S_T$ a besoin de gaussiennes. Formule de Box-Muller : si $U_1,U_2$ sont uniformes et indépendantes,
+\[ Z = \sqrt{-2\ln U_1}\,\cos(2\pi U_2)\ \sim\ \Ncal(0,1). \]
+\emph{Démonstration :} on pose $R = \sqrt{-2\ln U_1}$ et $\Theta = 2\pi U_2$.
+(1) $\Theta$ est uniforme sur $[0,2\pi[$.
+(2) $\Q(R^2>t) = \Q(U_1<e^{-t/2}) = e^{-t/2}$, donc $R$ a pour densité $r\,e^{-r^2/2}$.
+(3) $R$ et $\Theta$ sont indépendants : densité du couple $\frac{1}{2\pi}r\,e^{-r^2/2}$.
+(4) En passant en coordonnées $x = r\cos\theta$, $y = r\sin\theta$ (avec $dx\,dy = r\,dr\,d\theta$) : densité $\frac{1}{2\pi}e^{-(x^2+y^2)/2} = \varphi(x)\varphi(y)$.
+(5) Donc $x = R\cos\Theta$ a la densité $\varphi$ de la loi $\Ncal(0,1)$.}
+\calcul{\texttt{rng.random(n)} donne $n$ uniformes. On prend $U_1 = 1-U$ pour qu'il soit dans $]0,1]$ (jamais 0). Puis la formule, appliquée aux $n$ valeurs d'un coup.\\
+Exemple : $U_1 = 0{,}5$, $U_2 = 0{,}125$ $\Rightarrow$ $Z = \sqrt{-2\ln0{,}5}\times\cos(\pi/4) = 1{,}1774\times0{,}7071 = 0{,}8326$.}
+\resultat{Sur un million de tirages : moyenne $-0{,}0010$ (théorie 0), variance $0{,}9987$ (théorie 1), $\Q(|Z|\le1{,}96) = 0{,}9503$ (théorie 0,95). L'histogramme suit la courbe de la densité $\Ncal(0,1)$.}
+\prof{Pourquoi un seul $Z$ et pas $Z_1$ et $Z_2$ ?}{La formule complète donne deux gaussiennes, $R\cos\Theta$ et $R\sin\Theta$. Nous gardons seulement $Z = R\cos\Theta$ : le code est plus simple, chaque $Z$ vient de son propre couple $(U_1,U_2)$, et les $Z$ restent indépendants.}
+\prof{Pourquoi $1-U$ ?}{\texttt{rng.random} peut renvoyer 0, et $\ln 0$ n'existe pas. $1-U$ est dans $]0,1]$, donc $\ln(1-U)$ est toujours défini, et $1-U$ reste uniforme.}
+\prof{Comment savez-vous que vos tirages sont bons ?}{Par la démonstration, puis par la vérification : moyenne $\approx0$, variance $\approx1$, 95 \% des tirages entre $-1{,}96$ et $1{,}96$, et l'histogramme colle à la densité.}
+
+%==================================================================
+\sect{3. Formule exacte de Black-Scholes}
+\begin{lstlisting}
+def bs_call():
+    d1 = (np.log(S0 / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    return S0 * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+
+C_exact = bs_call()
+\end{lstlisting}
+\quoi{Calcule le prix exact du call. C'est la \textbf{référence} : elle sert à mesurer l'erreur de Monte-Carlo.}
+\source{Modèle de Black-Scholes : $dS_t = rS_tdt + \sigma S_tdW_t$. Le lemme d'Itô sur $\ln S_t$ donne $S_T = S_0e^{(r-\sigma^2/2)T+\sigma\sqrt TZ}$ ($S_T$ est log-normale). En calculant $e^{-rT}\E[(S_T-K)^+]$ avec la densité de $Z$ (on garde $Z>-d_2$ et on complète le carré), on obtient
+$C = S_0N(d_1) - Ke^{-rT}N(d_2)$.}
+\calcul{\texttt{norm.cdf} est $N(x) = \Q(Z\le x)$.
+$d_1 = (\ln1 + (0{,}05+0{,}02)\times1)/0{,}2 = 0{,}35$ ; $d_2 = 0{,}35-0{,}2 = 0{,}15$ ;
+$N(0{,}35) = 0{,}6368$ ; $N(0{,}15) = 0{,}5596$ ;
+$C = 100\times0{,}6368 - 100\,e^{-0{,}05}\times0{,}5596 = 10{,}4506$.}
+\resultat{\texttt{Prix exact du call : C = 10.4506}.}
+\prof{Pourquoi calculer le prix exact si on fait de la simulation ?}{Pour valider la simulation : on connaît la bonne réponse, donc on peut vérifier que Monte-Carlo la retrouve et mesurer son erreur.}
+\prof{Que représente $N(d_2)$ ?}{La probabilité (risque-neutre) que l'option finisse dans la monnaie : $\Q(S_T>K) = 0{,}5596$.}
+
+%==================================================================
+\sect{4. Monte-Carlo standard (la méthode de base)}
+\begin{lstlisting}
+def mc_call_standard(N, rng):
+    Z  = box_muller(N, rng)                                              # 1) tirages N(0,1)
+    ST = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)   # 2) prix finaux
+    Y  = np.exp(-r * T) * np.maximum(ST - K, 0.0)                        # 3) payoffs actualisés
+    prix = Y.mean()                                                      # 4) moyenne = prix estimé
+    se   = Y.std(ddof=1) / np.sqrt(N)                                    #    erreur standard
+    return prix, se
+
+C_mc, se_mc = mc_call_standard(N, rng)
+print(abs(C_exact - C_mc))                                               # erreur / prix analytique
+\end{lstlisting}
+\quoi{Estime le prix du call par la moyenne de $N$ payoffs simulés, avec son erreur standard. La formule de $S_T$ et le payoff sont écrits directement dans la fonction.}
+\source{\emph{Prix final :} la solution exacte de l'EDS donne $S_T = S_0\exp[(r-\sigma^2/2)T + \sigma\sqrt T\,Z]$ ; le $-\sigma^2/2$ vient du lemme d'Itô et garantit $\E[S_T] = S_0e^{rT}$. \emph{Payoff :} $\max(S_T-K,0)$, actualisé par $e^{-rT}$.\\
+\emph{Loi des grands nombres :} la moyenne de $N$ copies indépendantes de $Y$ tend vers $\E[Y] = C$. \emph{Théorème central limite :} $\hat C$ suit approximativement une loi normale de moyenne $C$ et d'écart-type $\sigma_Y/\sqrt N$, d'où $IC_{95\%} = \hat C\pm1{,}96\,SE$ avec $SE = s/\sqrt N$.}
+\calcul{(1) $N$ tirages par Box-Muller ; (2) $N$ prix finaux ; (3) $N$ payoffs actualisés ; (4) la moyenne. \texttt{Y.std(ddof=1)} est l'écart-type $s$ (avec $N-1$ au dénominateur).\\
+Exemple : $Z = +1$ $\Rightarrow$ $S_T = 100\,e^{0{,}03+0{,}2} = 125{,}86$, payoff $25{,}86$. $Z = -1$ $\Rightarrow$ $S_T = 84{,}37<K$, payoff $0$.\\
+\emph{Erreur :} comme pour $c$ dans la partie 6, on compare le résultat simulé à la valeur analytique : $|C_{\text{analytique}} - \hat C|$, avec $C_{\text{analytique}} = 10{,}4506$ (Black-Scholes).}
+\resultat{$N = 10^6$ : $\hat C = 10{,}4370$, $IC = [10{,}4081\ ;\ 10{,}4658]$, qui contient $10{,}4506$. \textbf{Erreur $|C_{\text{analytique}} - \hat C| = 0{,}013624$.}}
+\prof{Pourquoi pas de fonction pour $S_T$ et le payoff ?}{Ce sont deux formules d'une ligne : on les écrit directement là où on les utilise, le code est plus court et se lit d'un coup.}
+\prof{Pourquoi pas un schéma d'Euler ?}{La solution de l'EDS est connue exactement : on simule directement la vraie loi de $S_T$, sans erreur de discrétisation. Pour un call européen, seul $S_T$ compte.}
+\prof{Pourquoi 1,96 ?}{95 \% des valeurs d'une $\Ncal(0,1)$ sont entre $-1{,}96$ et $1{,}96$.}
+\prof{Pourquoi \texttt{ddof=1} ?}{Diviser par $N-1$ donne une estimation sans biais de la variance.}
+\prof{Pourquoi $e^{-rT}$ ?}{Pour actualiser : le payoff est reçu dans un an, on le ramène à aujourd'hui.}
+\prof{Votre prix ($10{,}4370$) n'est pas égal à $10{,}4506$ : erreur ?}{Non : c'est une estimation aléatoire. L'écart ($-0{,}014$) est plus petit que la demi-largeur de l'IC ($0{,}029$), et l'IC contient le prix exact.}
+
+%==================================================================
+\sect{4.1 Intervalle de confiance en fonction de $N$}
+\begin{lstlisting}
+liste_N = np.unique(np.logspace(3, 6, 25).astype(int))   # 25 valeurs de 10^3 à 10^6
+for n in liste_N:
+    p, se = mc_call_standard(n, rng)
+    prix.append(p)
+    demi_ic.append(z95 * se)
+\end{lstlisting}
+\quoi{Trace le prix estimé et son IC à 95 \% pour 25 valeurs de $N$ entre $10^3$ et $10^6$ : c'est le graphique demandé à l'étape 2 de l'énoncé.}
+\calcul{\texttt{np.logspace(3, 6, 25)} donne 25 valeurs réparties en échelle logarithmique. Pour chaque $N$, on garde le prix et la demi-largeur $1{,}96\,SE$.}
+\resultat{L'intervalle se resserre autour de $10{,}4506$. Pour les 25 valeurs de $N$, le prix exact est dans l'IC.}
+\prof{Comment diminue l'erreur ?}{En $1/\sqrt N$ : pour diviser l'erreur par 10, il faut 100 fois plus de simulations. C'est la limite de Monte-Carlo, d'où la réduction de variance.}
+
+%==================================================================
+\sect{4.2 Prix pour les puissances de 10 ($N = 10, 100, \dots, 10^6$)}
+\begin{lstlisting}
+puissances = [10**k for k in range(1, 7)]
+for n in puissances:
+    p, se = mc_call_standard(n, rng)
+    # affiche : N, prix, IC 95 %, |C_MC - C|
+\end{lstlisting}
+\quoi{Calcule le prix pour $N = 10^1, 10^2, \dots, 10^6$, l'affiche dans un tableau avec l'IC et l'erreur $|\hat C - C|$. (Tableau seulement, sans graphique.)}
+\resultat{\small
+\begin{tabular}{rccc}
+\toprule
+$N$ & Prix MC & IC à 95 \% & $|\hat C - C|$ \\
+\midrule
+10 & 11,9906 & [3,8810 ; 20,1002] & 1,5400 \\
+100 & 10,1197 & [7,1120 ; 13,1275] & 0,3309 \\
+1\,000 & 10,4897 & [9,5733 ; 11,4061] & 0,0391 \\
+10\,000 & 10,5740 & [10,2834 ; 10,8645] & 0,1234 \\
+100\,000 & 10,4234 & [10,3326 ; 10,5141] & 0,0272 \\
+1\,000\,000 & 10,4371 & [10,4083 ; 10,4660] & 0,0134 \\
+\bottomrule
+\end{tabular}\\
+Le prix exact est dans tous les IC. Chaque fois que $N$ est multiplié par 10, l'IC est divisé par environ $\sqrt{10}\approx3{,}16$.}
+\prof{L'erreur à $N = 10^4$ (0,12) est plus grande qu'à $N = 10^3$ (0,04) : pourquoi ?}{L'erreur d'une seule simulation dépend du hasard. Ce qui diminue toujours, c'est la largeur de l'IC : $\pm0{,}92$ à $10^3$, $\pm0{,}29$ à $10^4$. Et les deux IC contiennent le prix exact.}
+
+%==================================================================
+\sect{4.3 Trajectoire de l'estimateur : stabilité}
+\begin{lstlisting}
+Z  = box_muller(N, rng)
+ST = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)
+Y  = np.exp(-r * T) * np.maximum(ST - K, 0.0)
+n  = np.arange(1, N + 1)
+C_n = np.cumsum(Y) / n                     # moyenne des n premiers payoffs
+\end{lstlisting}
+\quoi{Suit la moyenne $\hat C_n = \frac1n\sum_{i\le n}Y_i$ au fur et à mesure que $n$ augmente, sur une seule simulation d'un million de payoffs, pour voir si l'estimateur se \emph{stabilise}.}
+\source{Loi des grands nombres : $\hat C_n\to C$. L'enveloppe $C\pm1{,}96\,s/\sqrt n$ (en pointillés) est la zone où la trajectoire doit rester 95 \% du temps (TCL).}
+\calcul{\texttt{np.cumsum(Y)} donne les sommes cumulées $Y_1, Y_1+Y_2, \dots$ ; on divise par $n = 1, 2, \dots, N$.}
+\resultat{Au début la moyenne bouge beaucoup, puis elle se stabilise : $\hat C_{1\,000} = 10{,}6402$, $\hat C_{1\,000\,000} = 10{,}4308$, dans l'enveloppe autour de $10{,}4506$.}
+\prof{Que montre ce graphique ?}{La stabilité de Monte-Carlo : plus on ajoute de simulations, moins la moyenne bouge, et elle reste dans l'enveloppe $\pm1{,}96\,s/\sqrt n$ qui se resserre autour du prix exact.}
+
+%==================================================================
+\sect{5. Variables antithétiques}
+\begin{lstlisting}
+def mc_call_antithetic(N, rng):
+    Z = box_muller(N // 2, rng)                                  # N/2 tirages
+    ST_plus  = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)    # avec Z
+    ST_minus = S0 * np.exp((r - 0.5 * sigma**2) * T - sigma * np.sqrt(T) * Z)    # avec -Z
+    Y_plus   = np.exp(-r * T) * np.maximum(ST_plus - K, 0.0)
+    Y_minus  = np.exp(-r * T) * np.maximum(ST_minus - K, 0.0)
+    Y_anti   = (Y_plus + Y_minus) / 2                    # moyenne de chaque paire
+    prix = Y_anti.mean()
+    se   = Y_anti.std(ddof=1) / np.sqrt(N // 2)
+    return prix, se
+
+C_a, se_a = mc_call_antithetic(N, rng)
+print(abs(C_exact - C_a))                                    # erreur / prix analytique
+\end{lstlisting}
+\quoi{Pour chaque $Z$, utilise aussi $-Z$ et fait la moyenne des deux payoffs. Même budget que le standard : $N/2$ tirages donnent $N$ payoffs.}
+\source{$-Z$ a la même loi que $Z$, donc pas de biais. Avec $\rho = \Corr(Y^+,Y^-)$ : $\Var\big(\frac{Y^++Y^-}{2}\big) = \frac{\sigma_Y^2}{2}(1+\rho)$, d'où un \textbf{gain de variance} $= 1/(1+\rho)$. Le payoff est croissant en $Z$, donc $\rho<0$ : la variance baisse.}
+\calcul{L'erreur standard est calculée sur les $N/2$ moyennes de paires (qui sont indépendantes), d'où $\sqrt{N/2}$.}
+\resultat{$\hat C_a = 10{,}4600$, $SE = 0{,}01039$ contre $0{,}01471$ en standard : gain $= (0{,}01471/0{,}01039)^2 = 2{,}00$, donc $\rho\approx-0{,}50$. \textbf{Erreur $|C_{\text{analytique}} - \hat C_a| = 0{,}009445$.}}
+\prof{Pourquoi $-Z$ donne $-\sigma\sqrt T Z$ dans \texttt{ST\_minus} ?}{On remplace $Z$ par $-Z$ dans la formule de $S_T$ : le terme $+\sigma\sqrt T\,Z$ devient $-\sigma\sqrt T\,Z$.}
+\prof{Pourquoi $N/2$ tirages ?}{Pour comparer à budget égal : $N/2$ paires $= N$ payoffs, comme le Monte-Carlo standard. Sinon la comparaison serait injuste.}
+\prof{Pourquoi le gain n'est que de 2 ?}{Le payoff du call est convexe : nul quand $Z$ est négatif, exponentiel quand $Z$ est grand. Quand $Z$ est grand, $Y^+$ est grand et $Y^- = 0$ : la paire ne se compense pas. La corrélation n'est que de $-0{,}5$, donc gain $= 1/(1-0{,}5) = 2$.}
+
+%==================================================================
+\sect{6. Variable de contrôle, calcul de $c$ et erreur sur $c$}
+\begin{lstlisting}
+def mc_call_control(N, rng):
+    Z  = box_muller(N, rng)
+    ST = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)
+    Y  = np.exp(-r * T) * np.maximum(ST - K, 0.0)
+    X  = ST                                            # variable de contrôle
+    EX = S0 * np.exp(r * T)                            # son espérance exacte
+    c_star = np.cov(Y, X)[0, 1] / np.var(X, ddof=1)    # c* = Cov(Y,X) / Var(X)
+    Y_c  = Y - c_star * (X - EX)                       # estimateur corrigé
+    prix = Y_c.mean()
+    se   = Y_c.std(ddof=1) / np.sqrt(N)
+    return prix, se, c_star
+
+C_c, se_c, c_star = mc_call_control(N, rng)
+print(abs(C_exact - C_c))                                           # erreur sur le prix
+
+# c analytique (formule exacte) et erreur
+d1 = (np.log(S0 / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
+E_ST    = S0 * np.exp(r * T)                                        # E[S_T]
+E_ST_1  = E_ST * norm.cdf(d1)                                       # E[S_T 1{S_T>K}]
+E_ST2_1 = S0**2 * np.exp((2*r + sigma**2) * T) * norm.cdf(d1 + sigma*np.sqrt(T))
+cov_exact = np.exp(-r * T) * (E_ST2_1 - K * E_ST_1) - C_exact * E_ST   # Cov(Y, S_T)
+var_exact = S0**2 * np.exp(2 * r * T) * (np.exp(sigma**2 * T) - 1)     # Var(S_T)
+c_analytique = cov_exact / var_exact
+print(abs(c_analytique - c_star))                                   # erreur sur c
+\end{lstlisting}
+\quoi{Corrige chaque payoff avec $X = S_T$, dont on connaît l'espérance exacte $S_0e^{rT} = 105{,}13$ : $Y_c = Y - c^*(X - \E X)$.}
+\source{\emph{Pas de biais :} $\E[Y_c] = \E[Y] - c\,(\E X - \E X) = C$ pour tout $c$.
+\emph{Comment on trouve $c$ :} la variance $g(c) = \Var Y - 2c\Cov(Y,X) + c^2\Var X$ est une parabole en $c$. On dérive : $g'(c) = -2\Cov(Y,X) + 2c\Var X = 0$, donc
+\[ c^* = \frac{\Cov(Y,X)}{\Var(X)}, \]
+et $g''(c) = 2\Var X>0$ : c'est un minimum. La variance devient $(1-\rho_{XY}^2)\Var Y$, d'où un gain $= 1/(1-\rho_{XY}^2)$.}
+\calcul{\emph{$c$ par simulation :} \texttt{np.cov(Y, X)} donne la matrice $\begin{pmatrix}\Var Y & \Cov(Y,X)\\ \Cov(X,Y) & \Var X\end{pmatrix}$ ; l'élément \texttt{[0, 1]} est $\Cov(Y,X)$. On divise par \texttt{np.var(X, ddof=1)}.\\
+\emph{$c$ analytique :} avec la loi log-normale de $S_T$ (même technique que Black-Scholes : on garde $S_T>K$ et on complète le carré) : $\E[S_T\1_{S_T>K}] = S_0e^{rT}N(d_1)$, $\E[S_T^2\1_{S_T>K}] = S_0^2e^{(2r+\sigma^2)T}N(d_1+\sigma\sqrt T)$, $\Var(S_T) = S_0^2e^{2rT}(e^{\sigma^2T}-1)$, puis $\Cov(Y,S_T) = e^{-rT}(\E[S_T^2\1] - K\,\E[S_T\1]) - C\,\E[S_T]$ et $c = \Cov/\Var$.\\
+\emph{Erreurs :} $|c_{\text{analytique}} - c^*|$ pour $c$, et $|C_{\text{analytique}} - \hat C_c|$ pour le prix.}
+\resultat{$c_{\text{analytique}} = 0{,}640762$, $c^* = 0{,}640505$ : \textbf{erreur $= 0{,}000257$}. Prix $\hat C_c = 10{,}4472$, $SE = 0{,}00562$, IC $[10{,}4362\ ;\ 10{,}4582]$ qui contient $10{,}4506$, \textbf{erreur sur le prix $= 0{,}003408$}. Gain $= (0{,}01471/0{,}00562)^2 = 6{,}86$, donc $\rho_{XY}\approx0{,}92$.}
+\prof{Comment avez-vous trouvé $c$ ?}{En minimisant la variance de $Y_c$ : c'est une parabole en $c$, la dérivée s'annule en $c^* = \Cov(Y,X)/\Var(X)$. Le code le calcule à partir des simulations : $0{,}6405$. La formule exacte donne $0{,}6408$ : l'erreur n'est que de $0{,}00026$.}
+\prof{Pourquoi $S_T$ comme variable de contrôle ?}{Parce que (1) on connaît exactement son espérance, $S_0e^{rT}$, et (2) il est très corrélé au payoff ($\rho\approx0{,}92$) : quand $S_T$ est grand, le payoff aussi.}
+\prof{Calculer $c$ sur les mêmes tirages, ça ne crée pas de biais ?}{Un biais de l'ordre de $1/N$, donc négligeable pour $N = 10^6$ (beaucoup plus petit que l'erreur standard).}
+\prof{Pourquoi l'erreur sur $c$ n'est pas nulle ?}{$c^*$ est calculé à partir d'un échantillon : c'est une estimation, qui a sa propre erreur aléatoire, de l'ordre de $1/\sqrt N$. Avec $N = 10^6$, elle vaut $0{,}00026$, soit 0,04 \% de $c$.}
+\prof{Pourquoi pas $c = 1$ ?}{$c = 1$ n'est pas le minimum de la parabole : la variance serait plus grande qu'avec $c^* = 0{,}64$.}
+
+%==================================================================
+\sect{7. Justification théorique}
+\quoi{Cellule de texte (pas de code) qui rappelle les deux démonstrations : antithétique (variance $\frac{\Var Y}{2}(1+\rho)$ avec $\rho<0$) et variable de contrôle (parabole, dérivée nulle, $c^* = \Cov/\Var$, variance $\Var(Y)(1-\rho^2)$). Elles sont détaillées dans les sections 5 et 6 ci-dessus et dans le rapport.}
+
+%==================================================================
+\sect{8. Comparaison des trois estimateurs}
+\begin{lstlisting}
+methodes  = {"Standard": mc_call_standard, "Antithétique": mc_call_antithetic, "Contrôle": mc_call_control}
+resultats = {"Standard": (C_mc, se_mc), "Antithétique": (C_a, se_a), "Contrôle": (C_c, se_c)}
+
+# temps de calcul : moyenne sur 5 exécutions, avec un générateur à part (rng n'est pas modifié)
+rng_t = np.random.default_rng(0)
+temps = {}
+for nom, methode in methodes.items():
+    t0 = time.perf_counter()
+    for _ in range(5):
+        methode(N, rng_t)
+    temps[nom] = (time.perf_counter() - t0) / 5
+
+for nom, (prix, se) in resultats.items():
+    gain = (se_mc / se)**2
+    t = temps[nom]
+    # affiche : prix, SE, IC, MSE = SE², gain, temps, efficacité = gain * t_std / t
+\end{lstlisting}
+\quoi{Rassemble les trois résultats déjà calculés (avec le même budget $N = 10^6$) dans un tableau.}
+\source{L'énoncé demande l'erreur quadratique moyenne, le gain de variance et le temps de calcul.}
+\calcul{\textbf{MSE} $= \E[(\hat C-C)^2]$ = biais$^2$ + variance ; les estimateurs sont sans biais, donc $MSE = SE^2$.
+\textbf{Gain} $= SE_{MC}^2/SE^2$. \textbf{Temps} : moyenne de 5 exécutions de chaque méthode, mesurée avec \texttt{time.perf\_counter()}. \textbf{Efficacité} $=$ gain $\times\,t_{MC}/t$.}
+\resultat{\small
+\begin{tabular}{lcccccc}
+\toprule
+Méthode & Prix & $SE$ & IC à 95 \% & MSE & Gain & Efficacité \\
+\midrule
+Standard & 10,4370 & 0,01471 & [10,4081 ; 10,4658] & 0,000216 & $\times1{,}00$ & $\times1{,}0$ \\
+Antithétique & 10,4600 & 0,01039 & [10,4397 ; 10,4804] & 0,000108 & $\times2{,}00$ & $\times3{,}5$ \\
+Contrôle & 10,4472 & 0,00562 & [10,4362 ; 10,4582] & 0,000032 & $\times6{,}86$ & $\times4{,}7$ \\
+\bottomrule
+\end{tabular}}
+\prof{Quel est le meilleur estimateur ?}{La variable de contrôle : plus petite erreur standard, donc IC 2,6 fois plus étroit, et meilleure efficacité même en comptant le temps.}
+\prof{Mais le contrôle ($10{,}4472$) n'est pas le plus proche de $10{,}4506$ à chaque fois !}{L'écart d'une seule simulation dépend du hasard : on ne choisit pas une méthode là-dessus. On choisit sur l'erreur standard, qui mesure la précision de la méthode. Les trois IC contiennent le prix exact.}
+\prof{Que veut dire un gain de 6,86 ?}{La variable de contrôle atteint avec $N$ simulations la précision que le Monte-Carlo standard atteint avec $6{,}86\,N$.}
+\prof{Pourquoi mesurer le temps sur 5 exécutions, avec un autre générateur ?}{Une seule mesure de temps est trop bruitée (la première exécution est souvent plus lente). La moyenne de 5 est plus fiable. Le générateur \texttt{rng\_t} est séparé pour ne pas changer les tirages de \texttt{rng}, donc les résultats du notebook restent les mêmes.}
+\prof{Pourquoi l'efficacité ?}{Le contrôle coûte un peu plus de temps (calcul de $c$ et de $X$). L'efficacité dit si le gain reste rentable une fois ce temps payé : oui. Les temps changent d'une machine à l'autre.}
+
+%==================================================================
+\sect{8.1 Courbe de comparaison des trois méthodes}
+\begin{lstlisting}
+Y_anti = (Y_plus + Y_minus) / 2                      # antithétique, N/2 paires
+Y_c    = Y - c_star * (ST - S0 * np.exp(r * T))      # contrôle, avec le c* de la partie 6
+plt.plot(n,      np.cumsum(Y) / n)                   # standard
+plt.plot(2 * na, np.cumsum(Y_anti) / na)             # antithétique (2 payoffs par paire)
+plt.plot(n,      np.cumsum(Y_c) / n)                 # contrôle
+\end{lstlisting}
+\quoi{Trace, sur le même graphique, la trajectoire de l'estimation des trois méthodes quand le nombre de payoffs augmente (même budget).}
+\calcul{Pour chaque méthode, moyenne cumulée des valeurs simulées. Pour l'antithétique, chaque paire compte pour 2 payoffs, d'où l'abscisse $2\times$ (nombre de paires).}
+\resultat{Les trois courbes convergent vers $10{,}4506$. La variable de contrôle (en vert) oscille le moins : c'est la plus précise.}
+\prof{Pourquoi ce graphique en plus du tableau ?}{Le tableau donne la précision à $N = 10^6$ seulement ; la courbe montre comment chaque méthode se rapproche du prix exact pour tous les $N$.}
+
+%==================================================================
+\sect{8.2 Prix pour les puissances de 10 : les trois méthodes}
+\begin{lstlisting}
+for n in puissances:
+    for nom, methode in methodes.items():
+        p = methode(n, rng)[0]                       # [0] : le prix
+        # affiche : p et l'erreur abs(C_exact - p)
+\end{lstlisting}
+\quoi{Refait le tableau de la partie 4.2 ($N = 10, \dots, 10^6$) avec les trois méthodes : prix et erreur $|C_{\text{analytique}} - \hat C|$ (tableau seulement, sans graphique).}
+\calcul{Pour chaque $N$ et chaque méthode : un appel de la fonction ; on garde le prix (\texttt{[0]}) et on calcule l'erreur.}
+\resultat{\small
+\begin{tabular}{rcccccc}
+\toprule
+$N$ & Standard & erreur & Antithétique & erreur & Contrôle & erreur \\
+\midrule
+10 & 8,3558 & 2,0948 & 4,7035 & 5,7471 & 12,4296 & 1,9790 \\
+100 & 7,6188 & 2,8318 & 10,2746 & 0,1760 & 10,9364 & 0,4858 \\
+1\,000 & 10,3919 & 0,0587 & 10,4630 & 0,0124 & 10,0182 & 0,4324 \\
+10\,000 & 10,2897 & 0,1609 & 10,4057 & 0,0448 & 10,5298 & 0,0793 \\
+100\,000 & 10,4781 & 0,0275 & 10,4207 & 0,0299 & 10,4459 & 0,0046 \\
+1\,000\,000 & 10,4486 & 0,0020 & 10,4693 & 0,0187 & 10,4516 & 0,0010 \\
+\bottomrule
+\end{tabular}\\[4pt]
+Pour les trois méthodes, les prix se rapprochent de $10{,}4506$ quand $N$ grandit. À $N = 10^6$, les erreurs sont $0{,}0020$, $0{,}0187$ et $0{,}0010$.}
+\prof{À $N = 10$, l'antithétique donne 4,70, très loin du prix : pourquoi ?}{Avec $N = 10$, il n'y a que 5 paires : c'est beaucoup trop peu, le théorème central limite ne s'applique pas encore. Le tableau sert à voir ce qui se passe quand $N$ grandit.}
+\prof{À $N = 1\,000$, le contrôle a une erreur plus grande que le standard : la méthode est mauvaise ?}{Non. L'erreur d'une seule simulation dépend du hasard. Pour mesurer la précision, on répète le calcul à $N$ fixé : c'est la partie 8.3, où le contrôle est clairement le plus stable.}
+
+%==================================================================
+\sect{8.3 Stabilité des trois méthodes à $N = 10^6$ fixé}
+\begin{lstlisting}
+M = 50                                                # nombre de répétitions
+estimations = {nom: np.array([methode(N, rng)[0] for _ in range(M)]) for nom, methode in methodes.items()}
+
+for i, (nom, prix_M) in enumerate(estimations.items()):
+    erreur_moy = np.abs(C_exact - prix_M).mean()                     # erreur moyenne des 50 calculs
+    plt.plot(np.full(M, i), prix_M, "o", alpha=0.5, label=f"{nom} : erreur moyenne = {erreur_moy:.4f}")
+plt.axhline(C_exact, color="red", ls="--")                           # prix exact
+# puis tableau : moyenne, écart-type et erreur moyenne des 50 prix
+\end{lstlisting}
+\quoi{Fixe $N = 10^6$ et refait le calcul $M = 50$ fois avec chaque méthode (nouveaux tirages à chaque fois). Une seule figure : chaque colonne contient les 50 prix d'une méthode, la ligne rouge est le prix exact. L'erreur moyenne de chaque méthode est écrite dans la légende.}
+\source{Un seul calcul ne dit pas si une méthode est précise : il peut tomber près de $C$ par chance. En répétant 50 fois, on voit la dispersion réelle de chaque méthode.}
+\calcul{\texttt{methode(N, rng)[0]} : le prix d'un calcul. On en fait 50 : \texttt{prix\_M} (tableau de 50 prix).\\
+\texttt{np.full(M, i)} : 50 fois la position $i$ (0, 1 ou 2), pour placer les 50 points de la méthode dans sa colonne.\\
+\textbf{Erreur moyenne} $= \dfrac{1}{50}\sum_{j=1}^{50} |C_{\text{analytique}} - \hat C_j|$ : \texttt{np.abs(C\_exact - prix\_M).mean()}.\\
+\textbf{Écart-type} des 50 prix : \texttt{prix\_M.std(ddof=1)}.}
+\resultat{\small
+\begin{tabular}{lccc}
+\toprule
+Méthode & Moyenne des 50 prix & Écart-type & \textbf{Erreur moyenne} \\
+\midrule
+Standard & 10,4512 & 0,01619 & \textbf{0,01265} \\
+Antithétique & 10,4517 & 0,01052 & \textbf{0,00800} \\
+Contrôle & 10,4507 & 0,00567 & \textbf{0,00440} \\
+\bottomrule
+\end{tabular}\\[4pt]
+Les trois colonnes sont centrées sur $10{,}4506$ (pas de biais). La colonne du contrôle est la plus serrée : c'est la méthode la plus stable, avec une erreur moyenne environ 3 fois plus petite que le standard.}
+\prof{Pourquoi répéter 50 fois ?}{Pour voir la variabilité réelle de chaque méthode avec $N$ fixé. Une seule simulation peut tomber près de $C$ par hasard ; 50 répétitions montrent quelle méthode est vraiment la plus stable.}
+\prof{Quelle différence entre l'erreur moyenne et l'écart-type ?}{L'erreur moyenne mesure la distance moyenne au \emph{prix exact} ; l'écart-type mesure la dispersion des 50 prix autour de \emph{leur moyenne}. Comme il n'y a pas de biais, les deux classent les méthodes dans le même ordre (pour une loi normale, erreur moyenne $\approx 0{,}8\times$ écart-type).}
+\prof{Pourquoi l'écart-type des 50 prix est proche de $SE$ ?}{$SE = s/\sqrt N$ estime justement l'écart-type de $\hat C$ : $0{,}0147$ ; $0{,}0104$ ; $0{,}0056$. Les 50 répétitions le mesurent directement et donnent presque les mêmes valeurs, ce qui confirme les intervalles de confiance.}
+
+%==================================================================
+\sect{9. Courbe de gain}
+\begin{lstlisting}
+liste_N = np.unique(np.logspace(3, 6, 10).astype(int))
+for n in liste_N:
+    for nom, methode in methodes.items():
+        se_par_methode[nom].append(methode(n, rng)[1])     # SE de chaque méthode
+# gauche : SE en fonction de N (log-log) ; droite : gain = (SE_standard / SE)^2
+\end{lstlisting}
+\quoi{Calcule l'erreur standard des trois méthodes pour 10 valeurs de $N$, et trace : à gauche $SE$ en fonction de $N$, à droite le gain en fonction de $N$.}
+\source{$SE = \sigma/\sqrt N$, donc $\ln SE = \ln\sigma - \frac12\ln N$ : en log-log, une droite de pente $-1/2$. La réduction de variance change $\sigma$, pas $\sqrt N$.}
+\resultat{À gauche, trois droites parallèles de pente $-1/2$. À droite, gain constant : environ 2 (antithétique) et environ 7 (contrôle).}
+\prof{Pourquoi avoir tracé une courbe de gain ?}{Pour montrer \emph{comment} agit la réduction de variance : elle ne change pas la vitesse $1/\sqrt N$, elle abaisse la droite d'erreur. Et le gain ne dépend pas de $N$ : on le mesure une fois, il vaut pour tout $N$.}
+\prof{Pourquoi l'antithétique est la plus basse des deux ?}{Son gain vaut $1/(1+\rho)$ avec $\rho\approx-0{,}5$ : 2. Le contrôle vaut $1/(1-\rho^2)$ avec $\rho\approx0{,}92$ : environ 7. L'antithétique utilise seulement la symétrie de $Z$ ; le contrôle utilise une information en plus, l'espérance exacte de $S_T$.}
+
+\end{document}

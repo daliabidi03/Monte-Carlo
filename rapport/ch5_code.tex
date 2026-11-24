@@ -1,0 +1,115 @@
+\chapter{Implémentation : le code partie par partie}
+
+Le code est le notebook \texttt{Projet\_MonteCarlo\_Call.ipynb}. Il est volontairement court : les paramètres sont des variables simples, les formules de $S_T$ et du payoff sont écrites directement dans chaque fonction, et il ne contient que ce que demande l'énoncé. Il s'exécute du début à la fin en une vingtaine de secondes et redonne exactement les chiffres de ce rapport. L'explication détaillée, ligne par ligne, est dans le document \emph{Explication du code}.
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{>{\bfseries}p{1cm}p{5.2cm}L}
+\toprule
+Partie & Fonctions & Rôle \\
+\midrule
+1 & — & Imports, paramètres, générateur fixé \\
+2 & \texttt{box\_muller} & Fabriquer les tirages $Z\sim\Ncal(0,1)$ \\
+3 & \texttt{bs\_call} & Prix exact de Black-Scholes \\
+4 & \texttt{mc\_call\_standard} & Méthode de base : prix, IC, erreur, puissances de 10, trajectoire \\
+5 & \texttt{mc\_call\_antithetic} & Variables antithétiques \\
+6 & \texttt{mc\_call\_control} & Variable de contrôle, $c^*$, $c$ analytique et erreurs \\
+7 & — & Justification théorique \\
+8 & — & Comparaison : tableau, courbe, puissances de 10, stabilité à $N$ fixé \\
+9 & — & Courbe de gain \\
+\bottomrule
+\end{tabularx}
+\caption{Plan du notebook.}
+\end{table}
+
+\section*{1. Imports et paramètres}
+\addcontentsline{toc}{section}{1. Imports et paramètres}
+\begin{lstlisting}
+S0    = 100.0      # prix de l'action aujourd'hui
+K     = 100.0      # prix d'exercice (strike)
+T     = 1.0        # maturité : 1 an
+r     = 0.05       # taux sans risque
+sigma = 0.20       # volatilité
+N     = 1_000_000  # nombre de simulations
+rng = np.random.default_rng(2026)   # générateur fixé par une graine
+z95 = 1.96                          # P(|Z| <= 1.96) = 95 %
+\end{lstlisting}
+Les cinq paramètres sont écrits une seule fois et utilisés directement par toutes les fonctions. Le générateur \texttt{rng} est créé une seule fois avec la graine 2026 : en exécutant le notebook du début à la fin, on obtient toujours les mêmes nombres.
+
+\section*{2. Box-Muller}
+\addcontentsline{toc}{section}{2. Box-Muller}
+\begin{lstlisting}
+def box_muller(n, rng):
+    U1 = 1.0 - rng.random(n)          # uniforme sur ]0,1]
+    U2 = rng.random(n)                # uniforme sur [0,1[
+    return np.sqrt(-2.0 * np.log(U1)) * np.cos(2.0 * np.pi * U2)
+\end{lstlisting}
+Formule $Z = \sqrt{-2\ln U_1}\cos(2\pi U_2)$, démontrée au §\ref{sec:bm} : \textbf{une seule} gaussienne par couple d'uniformes. $1-U$ évite $\ln 0$. La cellule vérifie sur un million de tirages : moyenne $-0{,}0010$, variance $0{,}9987$, $\Q(|Z|\le1{,}96) = 0{,}9503$, et trace l'histogramme (figure~\ref{fig:bm}).
+
+\section*{3. Black-Scholes}
+\addcontentsline{toc}{section}{3. Black-Scholes}
+\begin{lstlisting}
+def bs_call():
+    d1 = (np.log(S0 / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    return S0 * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+\end{lstlisting}
+Formule démontrée au chapitre 2. \texttt{norm.cdf} est la fonction de répartition $N(x)$ de la loi $\Ncal(0,1)$ (bibliothèque \texttt{scipy}). Résultat : $\CBS = 10{,}4506$.
+
+\section*{4. Monte-Carlo standard}
+\addcontentsline{toc}{section}{4. Monte-Carlo standard}
+\begin{lstlisting}
+def mc_call_standard(N, rng):
+    Z  = box_muller(N, rng)                                              # 1) tirages N(0,1)
+    ST = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)   # 2) prix finaux
+    Y  = np.exp(-r * T) * np.maximum(ST - K, 0.0)                        # 3) payoffs actualisés
+    prix = Y.mean()                                                      # 4) moyenne
+    se   = Y.std(ddof=1) / np.sqrt(N)                                    #    erreur standard
+    return prix, se
+\end{lstlisting}
+Les quatre étapes de l'algorithme, une ligne chacune. La ligne 2 est la solution exacte de l'EDS (chapitre 2) : pas d'erreur de discrétisation. \texttt{ddof=1} divise par $N-1$. L'IC est \texttt{prix} $\pm$ \texttt{z95*se}, et l'erreur est \texttt{abs(C\_exact - prix)}. Résultat pour $N = 10^6$ : $10{,}4370$, IC $[10{,}4081\ ;\ 10{,}4658]$, erreur $0{,}0136$. Les cellules suivantes tracent l'IC pour 25 valeurs de $N$ (figure~\ref{fig:icN}), le tableau des puissances de 10 et la trajectoire \texttt{np.cumsum(Y) / n} (figure~\ref{fig:traj}).
+
+\section*{5. Variables antithétiques}
+\addcontentsline{toc}{section}{5. Variables antithétiques}
+\begin{lstlisting}
+def mc_call_antithetic(N, rng):
+    Z = box_muller(N // 2, rng)                                                  # N/2 tirages
+    ST_plus  = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)    # avec Z
+    ST_minus = S0 * np.exp((r - 0.5 * sigma**2) * T - sigma * np.sqrt(T) * Z)    # avec -Z
+    Y_plus   = np.exp(-r * T) * np.maximum(ST_plus - K, 0.0)
+    Y_minus  = np.exp(-r * T) * np.maximum(ST_minus - K, 0.0)
+    Y_anti   = (Y_plus + Y_minus) / 2                                            # moyenne de la paire
+    prix = Y_anti.mean()
+    se   = Y_anti.std(ddof=1) / np.sqrt(N // 2)
+    return prix, se
+\end{lstlisting}
+$N/2$ tirages donnent $N$ payoffs : même budget que le standard. Les $N/2$ moyennes de paires sont indépendantes, d'où l'erreur standard calculée avec $\sqrt{N/2}$. Résultat : $10{,}4600$, $SE = 0{,}01039$, erreur $0{,}0094$.
+
+\section*{6. Variable de contrôle et calcul de $c$}
+\addcontentsline{toc}{section}{6. Variable de contrôle et calcul de c}
+\begin{lstlisting}
+def mc_call_control(N, rng):
+    Z  = box_muller(N, rng)
+    ST = S0 * np.exp((r - 0.5 * sigma**2) * T + sigma * np.sqrt(T) * Z)
+    Y  = np.exp(-r * T) * np.maximum(ST - K, 0.0)
+    X  = ST                                            # variable de contrôle
+    EX = S0 * np.exp(r * T)                            # son espérance exacte
+    c_star = np.cov(Y, X)[0, 1] / np.var(X, ddof=1)    # c* = Cov(Y,X) / Var(X)
+    Y_c  = Y - c_star * (X - EX)                       # estimateur corrigé
+    prix = Y_c.mean()
+    se   = Y_c.std(ddof=1) / np.sqrt(N)
+    return prix, se, c_star
+
+# c analytique (loi log-normale de S_T)
+c_analytique = cov_exact / var_exact
+print(abs(c_analytique - c_star))                      # erreur sur c
+\end{lstlisting}
+\texttt{np.cov(Y, X)} renvoie la matrice de covariance de $(Y,X)$ ; son élément \texttt{[0, 1]} est $\Cov(Y,X)$. La formule $c^* = \Cov(Y,X)/\Var(X)$ est démontrée au chapitre 3, ainsi que $c_{\text{analytique}}$. Résultat : $c^* = 0{,}640505$, $c_{\text{analytique}} = 0{,}640762$, erreur $0{,}000257$ ; prix $10{,}4472$, $SE = 0{,}00562$, erreur $0{,}0034$.
+
+\section*{7 à 9. Théorie, comparaison et courbe de gain}
+\addcontentsline{toc}{section}{7 à 9. Théorie, comparaison et courbe de gain}
+La partie 7 rappelle les démonstrations. La partie 8 reprend les trois résultats et affiche le tableau~\ref{tab:rv} (temps moyen sur 5 exécutions mesuré par \texttt{time.perf\_counter()}), trace la courbe de comparaison (figure~\ref{fig:cmp3}), le tableau des puissances de 10 pour les trois méthodes, puis répète 50 fois chaque méthode à $N = 10^6$ pour la stabilité et l'erreur moyenne (figure~\ref{fig:stab}). La partie 9 calcule l'erreur standard des trois méthodes pour 10 valeurs de $N$ et trace la courbe de gain (figure~\ref{fig:gain}).
+
+\begin{retenir}
+\textbf{Reproductibilité.} En exécutant le notebook de haut en bas (\emph{Kernel $\to$ Restart \& Run All}), on retrouve tous les nombres et toutes les figures de ce rapport. Seuls les temps de calcul varient d'une machine à l'autre.
+\end{retenir}

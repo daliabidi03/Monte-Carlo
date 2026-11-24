@@ -1,7 +1,7 @@
 # Monte-Carlo pour la valorisation d'options
 
 Projet du module **Mathématiques et Assurance** · ESPRIT · 2026-2027 · Encadrant : M. Mohsen Chebbi
-Équipe : Mohamed Derbel, Oumaima Mrabet, Tasnim Ghodbane, Adem Ben Ali, Mariem Hamouda.
+Équipe : Mohamed Derbel, Oumaima Mrabet, Tasnim Ghodbane, Adem Ben Ali, Mariem Hamouda, Mohamed Ali Bencherif.
 
 On calcule le prix d'un **call européen** par simulation de Monte-Carlo et on le compare au prix exact de **Black-Scholes** ($C_{BS} = 10{,}4506$). On réduit ensuite l'erreur avec deux techniques de réduction de variance : les **variables antithétiques** et la **variable de contrôle**. Enfin, on applique la méthode à une **option asiatique** (moyenne arithmétique), qui n'a pas de formule fermée. Tous les tirages gaussiens sont fabriqués par la **méthode de Box-Muller**.
 
